@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vos gains · Ambassadeurs UNUSUALL</title>
-  <meta name="description" content="30 % du premier mois payé puis 10 % chaque mois du 3e au 12e mois. Jusqu'à 103 870 FCFA par an pour un seul restaurant Epicure. Simulez vos gains.">
+  <meta name="description" content="30 % du premier mois, puis 10 % chaque mois pendant un an. Jusqu'à 103 870 FCFA par an pour un seul restaurant. Calculez vos gains.">
   <link rel="canonical" href="https://ambassadeurs.unusuall.online/gains.html">
   <meta property="og:locale" content="fr_FR">
   <meta property="og:site_name" content="UNUSUALL">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://ambassadeurs.unusuall.online/gains.html">
   <meta property="og:title" content="Vos gains · Ambassadeurs UNUSUALL">
-  <meta property="og:description" content="30 % du premier mois payé puis 10 % chaque mois du 3e au 12e mois. Jusqu'à 103 870 FCFA par an pour un seul restaurant Epicure. Simulez vos gains.">
+  <meta property="og:description" content="30 % du premier mois, puis 10 % chaque mois pendant un an. Jusqu'à 103 870 FCFA par an pour un seul restaurant. Calculez vos gains.">
   <meta property="og:image" content="https://ambassadeurs.unusuall.online/assets/img/og.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -23,8 +23,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script>try{if(localStorage.getItem('unusuall-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
-  <link rel="stylesheet" href="assets/css/app.css?v=4">
-  <script src="assets/js/app.js?v=4" defer></script>
+  <link rel="stylesheet" href="assets/css/app.css?v=5">
+  <script src="assets/js/app.js?v=5" defer></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -98,38 +98,19 @@
 
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Vos gains</p>
-            <h1 class="pg-title">Vous signez une fois, <span class="flame-text">vous êtes payé tous les mois.</span></h1>
-            <p>Une prime à la signature, puis une commission chaque mois tant que le client paie son abonnement, jusqu'au 12e mois. Les mêmes règles s'appliqueront à chaque nouveau produit.</p>
+            <h1 class="pg-title">Un client signé, <span class="flame-text">12 mois de revenus.</span></h1>
           </div>
 
           <div class="amb-rule" data-ep-stagger>
-            <div><b>30 %</b><span>du premier mois payé : votre prime de signature, versée dès l'encaissement.</span></div>
-            <div><b>10 %</b><span>de chaque mois payé, du 3e au 12e mois : votre revenu mensuel.</span></div>
-            <div><b>0</b><span>commission sur un mois offert au client, puisque rien n'est encaissé.</span></div>
-          </div>
-
-          <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Epicure : ce que vous rapporte chaque restaurant</h2>
-            </div>
-            <div class="amb-table" data-ep-reveal>
-              <table>
-                <thead><tr><th scope="col">Formule</th><th scope="col">Prix / mois</th><th scope="col">Prime de signature</th><th scope="col">Chaque mois (3e au 12e)</th><th scope="col">Total sur un an</th></tr></thead>
-                <tbody>
-                  <tr><th scope="row">Standard</th><td>27 900</td><td>8 370</td><td>2 790</td><td><b>36 270</b></td></tr>
-                  <tr class="is-hot"><th scope="row">Premium</th><td>45 900</td><td>13 770</td><td>4 590</td><td><b>59 670</b></td></tr>
-                  <tr><th scope="row">Ultra</th><td>79 900</td><td>23 970</td><td>7 990</td><td><b>103 870</b></td></tr>
-                </tbody>
-              </table>
-              <p>Montants en FCFA, pour un restaurant qui reste abonné toute l'année.</p>
-            </div>
+            <div><b>30 %</b><span>du 1er mois, dès la signature</span></div>
+            <div><b>10 %</b><span>chaque mois, du 3e au 12e</span></div>
           </div>
 
           <div class="ep-section">
             <div class="amb-sim" data-ep-reveal>
               <div>
-                <h2>Simulez vos gains</h2>
-                <p class="amb-sim__hint">Combien de restaurants pensez-vous convaincre ?</p>
+                <h2>Calculez vos gains</h2>
+                <p class="amb-sim__hint">Combien de restaurants pouvez-vous convaincre ?</p>
               <div class="amb-sim__row">
                 <label for="s-standard">Standard</label>
                 <div class="amb-stepper"><button type="button" data-step="-1" data-for="s-standard" aria-label="Moins de restaurants Standard">−</button><input id="s-standard" type="number" min="0" max="200" value="5" inputmode="numeric"><button type="button" data-step="1" data-for="s-standard" aria-label="Plus de restaurants Standard">+</button></div>
@@ -144,16 +125,31 @@
               </div>
               </div>
               <div class="amb-sim__result" aria-live="polite">
-                <div><small>Primes de signature</small><b id="r-sign">107 130</b><span>FCFA, dès le premier paiement</span></div>
-                <div><small>Revenu mensuel</small><b id="r-month">35 710</b><span>FCFA par mois, pendant 10 mois</span></div>
+                <div><small>À la signature</small><b id="r-sign">107 130</b><span>FCFA</span></div>
+                <div><small>Chaque mois</small><b id="r-month">35 710</b><span>FCFA, pendant 10 mois</span></div>
                 <div class="amb-sim__total"><small>Total sur un an</small><b id="r-year">464 230</b><span>FCFA</span></div>
               </div>
             </div>
           </div>
 
+          <div class="ep-section">
+            <div class="ep-head" data-ep-reveal><h2>Par restaurant Epicure</h2></div>
+            <div class="amb-table" data-ep-reveal>
+              <table>
+                <thead><tr><th scope="col">Formule</th><th scope="col">À la signature</th><th scope="col">Chaque mois</th><th scope="col">Sur un an</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Standard</th><td>8 370</td><td>2 790</td><td><b>36 270</b></td></tr>
+                  <tr class="is-hot"><th scope="row">Premium</th><td>13 770</td><td>4 590</td><td><b>59 670</b></td></tr>
+                  <tr><th scope="row">Ultra</th><td>23 970</td><td>7 990</td><td><b>103 870</b></td></tr>
+                </tbody>
+              </table>
+              <p>En FCFA. Le 2e mois est offert au client : pas de commission ce mois-là.</p>
+            </div>
+          </div>
+
           <div class="ep-final" data-ep-reveal>
-            <h2>Ces chiffres vous parlent ?</h2>
-            <p>Postulez en deux minutes, réponse sous 72 heures.</p>
+            <h2>Ces chiffres vous plaisent ?</h2>
+            <p>Inscrivez-vous en deux minutes.</p>
             <div class="pg-cta">
               <a class="btn btn--primary" href="postuler.html">Je postule →</a>
               <a href="avantages.html" class="btn btn--ghost">Voir les avantages</a>

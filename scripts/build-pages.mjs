@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '4';
+const V = '5';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -171,110 +171,102 @@ const FINAL = (title, text, alt = ['gains.html', 'Voir les gains']) => `
 const PAGES = [];
 
 /* 1. Programme */
+const FEED = `
+            <div class="amb-feed" aria-hidden="true">
+              <div class="amb-feed__head"><span class="amb-feed__dot"></span>Vos gains · exemple</div>
+              <ol class="amb-feed__list">
+                <li><span class="amb-feed__ico">✓</span><div><b>Nouveau client</b><small>Epicure Premium</small></div><em>+13 770 F</em></li>
+                <li><span class="amb-feed__ico">↻</span><div><b>Mois 3 payé</b><small>Mobile Money</small></div><em>+4 590 F</em></li>
+                <li><span class="amb-feed__ico">↻</span><div><b>Mois 4 payé</b><small>Mobile Money</small></div><em>+4 590 F</em></li>
+                <li><span class="amb-feed__ico">✓</span><div><b>Nouveau client</b><small>Epicure Ultra</small></div><em>+23 970 F</em></li>
+              </ol>
+              <div class="amb-feed__total"><small>Sur un an, 2 clients</small><b>163 540 FCFA</b></div>
+            </div>`;
+
 PAGES.push({
   file: 'index.html',
   title: 'Devenez Ambassadeur UNUSUALL · Programme Ambassadeurs',
-  desc: "Choisissez les produits UNUSUALL que vous voulez représenter, faites-les connaître et touchez 30 % du premier mois puis 10 % chaque mois pendant un an. Candidature gratuite.",
+  desc: "Parlez de nos produits autour de vous et gagnez de l'argent chaque mois. 30 % du premier mois, puis 10 % chaque mois pendant un an. Inscription gratuite.",
   windowTitle: 'Programme Ambassadeurs',
   body: `
-          <div class="ep-hero">
+          <div class="amb-hero">
             <div class="pg-copy">
-              <img class="amb-hero__mark" src="assets/img/mark-black.png" width="72" height="72" alt="">
               <div class="pg-pills">
-                <span class="pg-pill pg-pill--live"><i></i>Candidatures ouvertes</span>
-                <span class="pg-pill">UNUSUALL</span>
+                <span class="pg-pill pg-pill--live"><i></i>Inscriptions ouvertes</span>
               </div>
-              <p class="pg-eyebrow">Programme Ambassadeurs</p>
-              <h1 class="pg-title">Devenez <span class="flame-text">Ambassadeur UNUSUALL</span></h1>
-              <p class="ep-punch"><span>Choisissez vos produits.</span> <span>Faites-les connaître.</span> <span>Soyez payé chaque mois.</span></p>
-              <p class="pg-lead">Vous représentez les produits UNUSUALL de votre choix, comme vous l'entendez. Pour chaque client qui s'abonne, vous touchez <strong>30 % du premier mois</strong>, puis <strong>10 % chaque mois pendant un an</strong>.</p>
+              <h1 class="pg-title">Parlez de nos produits. <span class="flame-text">Gagnez chaque mois.</span></h1>
+              <p class="ep-punch"><span>Vous partagez.</span> <span>Ils s'abonnent.</span> <span>Vous êtes payé.</span></p>
+              <p class="pg-lead">Devenez Ambassadeur UNUSUALL. C'est gratuit et vous travaillez quand vous voulez.</p>
               <div class="pg-cta">
-                <a class="btn btn--primary" href="postuler.html">Je postule →</a>
-                <a href="gains.html" class="btn btn--ghost">Voir ce que je peux gagner</a>
+                <a class="btn btn--primary" href="connexion.html?mode=inscription">Je deviens ambassadeur →</a>
+                <a href="gains.html" class="btn btn--ghost">Combien je gagne ?</a>
               </div>
-              <ul class="ep-facts">
-                <li>Aucun frais d'entrée</li>
-                <li>Aucun diplôme exigé</li>
-                <li>Vos horaires, votre zone</li>
-              </ul>
-            </div>
+            </div>${FEED}
           </div>
 
           <ul class="ep-stats" data-ep-stagger>
-            <li><b><span class="ep-count" data-to="30">30</span> <small>%</small></b><span>du premier mois payé, pour vous</span></li>
-            <li><b><span class="ep-count" data-to="10">10</span> <small>%</small></b><span>de chaque mois, du 3e au 12e</span></li>
-            <li><b><span class="ep-count" data-to="103870">103 870</span></b><span>FCFA par an pour un seul client Epicure Ultra</span></li>
-            <li><b><span class="ep-count" data-to="0">0</span></b><span>franc à investir pour commencer</span></li>
+            <li><b><span class="ep-count" data-to="30">30</span> <small>%</small></b><span>du 1er mois pour vous</span></li>
+            <li><b><span class="ep-count" data-to="10">10</span> <small>%</small></b><span>chaque mois ensuite</span></li>
+            <li><b><span class="ep-count" data-to="12">12</span></b><span>mois de revenus par client</span></li>
+            <li><b><span class="ep-count" data-to="0">0</span> <small>F</small></b><span>pour commencer</span></li>
           </ul>
 
           <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Le principe, en 4 étapes</h2>
-              <p>De votre candidature à votre premier paiement.</p>
-            </div>
-            <ol class="ep-steps" data-ep-stagger>
-              <li><strong>Vous postulez</strong><span>Et vous choisissez les produits que vous voulez représenter. Réponse sous 72 heures.</span></li>
-              <li><strong>Vous êtes formé</strong><span>Formation offerte, kit complet et votre code ambassadeur personnel.</span></li>
-              <li><strong>Vous faites connaître</strong><span>En personne, sur WhatsApp, sur vos réseaux : comme vous le sentez, en respectant la charte.</span></li>
-              <li><strong>Vous êtes payé</strong><span>Chaque mois, par Mobile Money, avec un relevé détaillé de vos clients et de vos gains.</span></li>
+            <div class="ep-head" data-ep-reveal><h2>Simple comme 1, 2, 3</h2></div>
+            <ol class="ep-steps amb-steps3" data-ep-stagger>
+              <li><strong>Inscrivez-vous</strong><span>En deux minutes, gratuitement.</span></li>
+              <li><strong>Partagez</strong><span>Parlez de nos produits avec votre code.</span></li>
+              <li><strong>Encaissez</strong><span>Chaque mois, sur Mobile Money.</span></li>
             </ol>
           </div>
 
           <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Les produits que vous pouvez représenter</h2>
-              <p>Vous choisissez. Pour l'instant, Epicure est ouvert aux ambassadeurs ; d'autres produits arrivent.</p>
-            </div>
+            <div class="ep-head" data-ep-reveal><h2>Ce que vous représentez</h2><p>Vous choisissez vos produits.</p></div>
             <ul class="amb-products amb-products--compact" data-ep-stagger>
-              <li class="amb-product is-open"><img src="assets/img/epicure.webp" width="56" height="56" alt=""><div><strong>Epicure</strong><span>Gestion de restaurant</span></div><em class="pg-pill pg-pill--live"><i></i>Ouvert</em></li>
-              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.5 4 4 0 0 1 7 2.5c0 6.5-7 11-7 11z"/></svg></span><div><strong>Suite SOFIA</strong><span>Santé</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
-              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><div><strong>OMI</strong><span>Données mobiles</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
+              <li class="amb-product is-open"><img src="assets/img/epicure.webp" width="56" height="56" alt=""><div><strong>Epicure</strong><span>Pour les restaurants</span></div><em class="pg-pill pg-pill--live"><i></i>Ouvert</em></li>
+              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.5 4 4 0 0 1 7 2.5c0 6.5-7 11-7 11z"/></svg></span><div><strong>Suite SOFIA</strong><span>Pour la santé</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
+              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><div><strong>OMI</strong><span>Pour les données mobiles</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
             </ul>
-            <p class="amb-more"><a href="produits.html">Voir les produits en détail →</a></p>
           </div>
-${FINAL('Prêt à représenter UNUSUALL ?', 'Deux minutes pour postuler, une réponse sous 72 heures.')}`
+${FINAL('Prêt à gagner avec nous ?', 'Inscription gratuite. Réponse sous 72 heures.')}`
 });
 
 /* 2. Produits */
 PAGES.push({
   file: 'produits.html',
   title: 'Produits à représenter · Ambassadeurs UNUSUALL',
-  desc: 'Choisissez les produits UNUSUALL que vous voulez représenter. Epicure, le logiciel de gestion de restaurant, est ouvert aux ambassadeurs ; la Suite SOFIA et OMI arrivent bientôt.',
+  desc: "Choisissez les produits UNUSUALL que vous représentez. Epicure, pour les restaurants, est ouvert. La Suite SOFIA et OMI arrivent bientôt.",
   windowTitle: 'Produits',
   back: { href: 'index.html', label: 'Programme' },
   body: `
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Vous choisissez</p>
-            <h1 class="pg-title">Les produits que vous représentez</h1>
-            <p>À votre candidature, vous cochez les produits qui vous intéressent. Dès qu'un nouveau produit s'ouvre aux ambassadeurs, vous pourrez l'ajouter à votre profil.</p>
+            <h1 class="pg-title">Les produits que <span class="flame-text">vous représentez</span></h1>
+            <p>Un seul produit ou plusieurs : c'est vous qui décidez.</p>
           </div>
 
           <article class="amb-feature" data-ep-reveal>
             <div class="amb-feature__art"><img src="assets/img/epicure.webp" width="280" height="280" alt="Logo Epicure"></div>
             <div class="amb-feature__copy">
-              <div class="pg-pills"><span class="pg-pill pg-pill--live"><i></i>Ouvert aux ambassadeurs</span><span class="pg-pill">Suite OLIVIA</span></div>
+              <div class="pg-pills"><span class="pg-pill pg-pill--live"><i></i>Ouvert maintenant</span></div>
               <h2>Epicure</h2>
-              <p class="amb-feature__lead">Le logiciel qui aide les restaurants à ne plus perdre d'argent sans le savoir.</p>
-              <p>Le restaurateur note ses achats, crée ses recettes, vend, et Epicure fait les calculs : le coût de chaque plat, le stock en temps réel et les pertes, produit par produit. Sur téléphone, tablette ou ordinateur, même sans internet.</p>
-              ${CHECK(['<b>Pour qui :</b> restaurants, maquis, fast-foods, bars, hôtels-restaurants', '<b>Prix :</b> dès 27 900 FCFA par mois, sans engagement, en Mobile Money', '<b>Offre de lancement :</b> 1 mois payé, 1 mois offert', '<b>Vos gains :</b> jusqu\'à 103 870 FCFA par an et par restaurant'])}
+              <p class="amb-feature__lead">Le logiciel qui aide les restaurants à ne plus perdre d'argent.</p>
+              ${CHECK(['Pour les restaurants, maquis, bars et fast-foods', 'Dès 27 900 FCFA par mois, sans engagement', '1 mois payé, 1 mois offert pour démarrer', 'Jusqu\'à 103 870 FCFA par an pour vous, par restaurant'])}
               <div class="pg-cta">
-                <a class="btn btn--primary" href="postuler.html">Représenter Epicure →</a>
-                <a class="btn btn--ghost" href="https://unusuall.online/epicure.html" target="_blank" rel="noopener">Découvrir Epicure ↗</a>
+                <a class="btn btn--primary" href="connexion.html?mode=inscription">Je représente Epicure →</a>
+                <a class="btn btn--ghost" href="https://unusuall.online/epicure.html" target="_blank" rel="noopener">Voir Epicure ↗</a>
               </div>
             </div>
           </article>
 
           <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Bientôt ouverts aux ambassadeurs</h2>
-              <p>Inscrivez-vous dès maintenant : vous serez prévenu en priorité à leur ouverture.</p>
-            </div>
+            <div class="ep-head" data-ep-reveal><h2>Bientôt disponibles</h2><p>Inscrivez-vous : vous serez prévenu en premier.</p></div>
             <ul class="amb-products" data-ep-stagger>
-              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.5 4 4 0 0 1 7 2.5c0 6.5-7 11-7 11z"/></svg></span><div><strong>Suite SOFIA</strong><span>Digitaliser les établissements de santé : moins de paperasse, moins d'attente.</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
-              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><div><strong>OMI</strong><span>Organiser ses données mobiles et les retrouver en moins de 3 secondes.</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
+              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.5 4 4 0 0 1 7 2.5c0 6.5-7 11-7 11z"/></svg></span><div><strong>Suite SOFIA</strong><span>Pour les cliniques et hôpitaux.</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
+              <li class="amb-product"><span class="amb-product__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><div><strong>OMI</strong><span>Pour ranger ses données mobiles.</span></div><em class="pg-pill pg-pill--dev">Bientôt</em></li>
             </ul>
           </div>
-${FINAL('Epicure vous intéresse ?', 'Postulez aujourd\'hui et commencez dès votre validation.')}`
+${FINAL('Epicure vous parle ?', 'Inscrivez-vous et commencez dès votre validation.')}`
 });
 
 /* 3. Gains */
@@ -288,51 +280,47 @@ const stepper = (id, label, val) => `
 PAGES.push({
   file: 'gains.html',
   title: 'Vos gains · Ambassadeurs UNUSUALL',
-  desc: "30 % du premier mois payé puis 10 % chaque mois du 3e au 12e mois. Jusqu'à 103 870 FCFA par an pour un seul restaurant Epicure. Simulez vos gains.",
+  desc: "30 % du premier mois, puis 10 % chaque mois pendant un an. Jusqu'à 103 870 FCFA par an pour un seul restaurant. Calculez vos gains.",
   windowTitle: 'Gains',
   back: { href: 'index.html', label: 'Programme' },
   body: `
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Vos gains</p>
-            <h1 class="pg-title">Vous signez une fois, <span class="flame-text">vous êtes payé tous les mois.</span></h1>
-            <p>Une prime à la signature, puis une commission chaque mois tant que le client paie son abonnement, jusqu'au 12e mois. Les mêmes règles s'appliqueront à chaque nouveau produit.</p>
+            <h1 class="pg-title">Un client signé, <span class="flame-text">12 mois de revenus.</span></h1>
           </div>
 
           <div class="amb-rule" data-ep-stagger>
-            <div><b>30 %</b><span>du premier mois payé : votre prime de signature, versée dès l'encaissement.</span></div>
-            <div><b>10 %</b><span>de chaque mois payé, du 3e au 12e mois : votre revenu mensuel.</span></div>
-            <div><b>0</b><span>commission sur un mois offert au client, puisque rien n'est encaissé.</span></div>
-          </div>
-
-          <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Epicure : ce que vous rapporte chaque restaurant</h2>
-            </div>
-            <div class="amb-table" data-ep-reveal>
-              <table>
-                <thead><tr><th scope="col">Formule</th><th scope="col">Prix / mois</th><th scope="col">Prime de signature</th><th scope="col">Chaque mois (3e au 12e)</th><th scope="col">Total sur un an</th></tr></thead>
-                <tbody>
-${PLANS.map(([n, p], i) => `                  <tr${i === 1 ? ' class="is-hot"' : ''}><th scope="row">${n}</th><td>${f(p)}</td><td>${f(p * 0.3)}</td><td>${f(p * 0.1)}</td><td><b>${f(p * 0.3 + p * 0.1 * 10)}</b></td></tr>`).join('\n')}
-                </tbody>
-              </table>
-              <p>Montants en FCFA, pour un restaurant qui reste abonné toute l'année.</p>
-            </div>
+            <div><b>30 %</b><span>du 1er mois, dès la signature</span></div>
+            <div><b>10 %</b><span>chaque mois, du 3e au 12e</span></div>
           </div>
 
           <div class="ep-section">
             <div class="amb-sim" data-ep-reveal>
               <div>
-                <h2>Simulez vos gains</h2>
-                <p class="amb-sim__hint">Combien de restaurants pensez-vous convaincre ?</p>${stepper('s-standard', 'Standard', 5)}${stepper('s-premium', 'Premium', 3)}${stepper('s-ultra', 'Ultra', 1)}
+                <h2>Calculez vos gains</h2>
+                <p class="amb-sim__hint">Combien de restaurants pouvez-vous convaincre ?</p>${stepper('s-standard', 'Standard', 5)}${stepper('s-premium', 'Premium', 3)}${stepper('s-ultra', 'Ultra', 1)}
               </div>
               <div class="amb-sim__result" aria-live="polite">
-                <div><small>Primes de signature</small><b id="r-sign">107 130</b><span>FCFA, dès le premier paiement</span></div>
-                <div><small>Revenu mensuel</small><b id="r-month">35 710</b><span>FCFA par mois, pendant 10 mois</span></div>
+                <div><small>À la signature</small><b id="r-sign">107 130</b><span>FCFA</span></div>
+                <div><small>Chaque mois</small><b id="r-month">35 710</b><span>FCFA, pendant 10 mois</span></div>
                 <div class="amb-sim__total"><small>Total sur un an</small><b id="r-year">464 230</b><span>FCFA</span></div>
               </div>
             </div>
           </div>
-${FINAL('Ces chiffres vous parlent ?', 'Postulez en deux minutes, réponse sous 72 heures.', ['avantages.html', 'Voir les avantages'])}`
+
+          <div class="ep-section">
+            <div class="ep-head" data-ep-reveal><h2>Par restaurant Epicure</h2></div>
+            <div class="amb-table" data-ep-reveal>
+              <table>
+                <thead><tr><th scope="col">Formule</th><th scope="col">À la signature</th><th scope="col">Chaque mois</th><th scope="col">Sur un an</th></tr></thead>
+                <tbody>
+${PLANS.map(([n, p], i) => `                  <tr${i === 1 ? ' class="is-hot"' : ''}><th scope="row">${n}</th><td>${f(p * 0.3)}</td><td>${f(p * 0.1)}</td><td><b>${f(p * 0.3 + p * 0.1 * 10)}</b></td></tr>`).join('\n')}
+                </tbody>
+              </table>
+              <p>En FCFA. Le 2e mois est offert au client : pas de commission ce mois-là.</p>
+            </div>
+          </div>
+${FINAL('Ces chiffres vous plaisent ?', 'Inscrivez-vous en deux minutes.', ['avantages.html', 'Voir les avantages'])}`
 });
 
 /* 4. Avantages */
@@ -340,60 +328,50 @@ const PERK = (ico, t, d, gold) => `<li class="ep-card${gold ? ' ep-card--accent'
 PAGES.push({
   file: 'avantages.html',
   title: 'Vos avantages · Ambassadeurs UNUSUALL',
-  desc: "Formation offerte, titre officiel, priorité d'embauche, kit complet, accès gratuit aux produits pour vos démonstrations, communauté et liberté totale.",
+  desc: "Formation offerte, titre officiel, priorité d'embauche, kit complet et liberté totale.",
   windowTitle: 'Avantages',
   back: { href: 'index.html', label: 'Programme' },
   body: `
           <div class="ep-head amb-top" data-ep-reveal>
-            <p class="pg-eyebrow">Bien plus qu'une commission</p>
-            <h1 class="pg-title">Ce que vous gagnez <span class="flame-text">en devenant ambassadeur.</span></h1>
+            <p class="pg-eyebrow">En plus de l'argent</p>
+            <h1 class="pg-title">Vous gagnez <span class="flame-text">bien plus.</span></h1>
           </div>
 
           <ul class="ep-grid" data-ep-stagger>
-            ${PERK('<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>', 'Une formation offerte', 'Vente, marketing digital et connaissance des produits, avec une attestation UNUSUALL.')}
-            ${PERK('<circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 8 5-3 5 3-1.5-8"/>', 'Un titre officiel', '« Ambassadeur UNUSUALL », avec une attestation et un badge à afficher sur LinkedIn.')}
-            ${PERK('<path d="M20 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>', "La priorité d'embauche", 'Quand UNUSUALL recrute des commerciaux salariés, les meilleurs ambassadeurs passent en premier.', true)}
-            ${PERK('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>', 'Une lettre de recommandation', 'Signée par UNUSUALL, pour les ambassadeurs qui atteignent leurs objectifs.')}
-            ${PERK('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>', 'Un kit complet', 'Affiches, flyers, visuels, vidéos de démonstration et argumentaire prêts à l\'emploi.')}
-            ${PERK('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>', 'Les produits gratuits pour vos démos', 'Un accès complet pour montrer les produits en conditions réelles.')}
-            ${PERK('<path d="M3 11a8 8 0 0 1 15.5-2.8"/><path d="M21 13a8 8 0 0 1-15.5 2.8"/><path d="M18 3v5h-5M6 21v-5h5"/>', 'Mis en avant', 'Chaque mois, un « Ambassadeur du mois » présenté sur les réseaux d\'UNUSUALL.')}
-            ${PERK('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>', 'Une communauté', 'Un groupe privé d\'ambassadeurs pour partager les astuces et joindre l\'équipe vite.')}
-            ${PERK('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 'Une liberté totale', 'Vos horaires, votre zone, vos produits, votre façon de faire. Compatible avec des études ou un emploi.')}
+            ${PERK('<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>', 'Formation offerte', 'Vente et marketing, avec attestation.')}
+            ${PERK('<path d="M20 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>', "Priorité d'embauche", 'Les meilleurs sont recrutés en premier.', true)}
+            ${PERK('<circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 8 5-3 5 3-1.5-8"/>', 'Titre officiel', '« Ambassadeur UNUSUALL » sur votre CV.')}
+            ${PERK('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>', 'Kit complet', 'Visuels, vidéos et argumentaire prêts.')}
+            ${PERK('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>', 'Produits offerts', 'Pour faire vos démonstrations.')}
+            ${PERK('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 'Liberté totale', 'Vos horaires, votre zone.')}
           </ul>
 
           <div class="ep-section">
-            <div class="ep-head" data-ep-reveal>
-              <h2>Trois niveaux à débloquer</h2>
-              <p>Plus vos clients restent abonnés, plus vous montez.</p>
-            </div>
+            <div class="ep-head" data-ep-reveal><h2>Montez de niveau</h2></div>
             <div class="amb-levels" data-ep-stagger>
-              <div class="amb-level"><p class="amb-level__n">Niveau 1</p><h3>Ambassadeur</h3><p class="amb-level__when">Dès votre inscription</p>${CHECK(['Commissions de 30 % et 10 %', 'Formation et kit complet', 'Accès au groupe privé'])}</div>
-              <div class="amb-level"><p class="amb-level__n">Niveau 2</p><h3>Ambassadeur Confirmé</h3><p class="amb-level__when">À 5 clients actifs</p>${CHECK(['Tout le niveau 1', 'Formation avancée', 'Mise en avant sur nos réseaux'])}</div>
-              <div class="amb-level amb-level--top"><p class="amb-level__n">Niveau 3</p><h3>Ambassadeur Élite</h3><p class="amb-level__when">À 15 clients actifs</p>${CHECK(['Tout le niveau 2', "Priorité d'embauche", 'Lettre de recommandation', 'Votre avis compte dans nos décisions produits'])}</div>
+              <div class="amb-level"><p class="amb-level__n">Niveau 1</p><h3>Ambassadeur</h3><p class="amb-level__when">Dès l'inscription</p>${CHECK(['Commissions', 'Formation et kit'])}</div>
+              <div class="amb-level"><p class="amb-level__n">Niveau 2</p><h3>Confirmé</h3><p class="amb-level__when">5 clients actifs</p>${CHECK(['Formation avancée', 'Mis en avant sur nos réseaux'])}</div>
+              <div class="amb-level amb-level--top"><p class="amb-level__n">Niveau 3</p><h3>Élite</h3><p class="amb-level__when">15 clients actifs</p>${CHECK(["Priorité d'embauche", 'Lettre de recommandation'])}</div>
             </div>
           </div>
 
           <div class="ep-section">
             <div class="amb-charter" data-ep-reveal>
-              <div>
-                <h2>La charte, en bref</h2>
-                <p>Vous faites la publicité comme vous l'entendez, avec quelques règles simples pour protéger la marque et les clients.</p>
-              </div>
-              ${CHECK(['Utiliser votre code ambassadeur pour chaque client', 'Présenter les produits honnêtement, sans promettre ce qu\'ils ne font pas', 'Ne pas modifier les prix ni inventer de réductions', 'Pas de spam ni de faux comptes : une inscription fictive annule les commissions', 'Utiliser le logo et les visuels fournis'])}
+              <div><h2>Nos 3 règles</h2><p>Vous faites la publicité comme vous voulez, avec ces règles simples.</p></div>
+              ${CHECK(['Dire la vérité sur nos produits', 'Garder nos prix, sans fausses réductions', 'Pas de spam, pas de faux clients'])}
             </div>
           </div>
-${FINAL('Envie de rejoindre l\'équipe ?', 'Postulez et choisissez vos produits.')}`
+${FINAL('Envie de nous rejoindre ?', 'Inscription gratuite, réponse sous 72 heures.')}`
 });
 
 /* 5. Postuler */
 const FAQ = [
-  ['Faut-il de l\'expérience ?', 'Non. Une bonne connaissance de votre entourage professionnel et l\'envie de convaincre suffisent. La formation vous donne le reste.'],
-  ['Est-ce que je dois payer quelque chose ?', 'Non, rien. Le compte, la candidature, la formation, le kit et l\'accès aux produits pour vos démonstrations sont gratuits.'],
-  ['Pourquoi créer un compte ?', 'Votre compte garde votre candidature, puis devient votre espace ambassadeur : votre code, vos clients, vos gains et vos versements, à jour à tout moment.'],
-  ['Puis-je représenter plusieurs produits ?', 'Oui. Vous choisissez à la candidature, et vous pourrez ajouter les nouveaux produits dès leur ouverture aux ambassadeurs. Pour l\'instant, Epicure est ouvert.'],
-  ['Quand et comment suis-je payé ?', 'Chaque mois, par Mobile Money, après l\'encaissement des abonnements de vos clients. Chaque versement apparaît dans votre espace.'],
-  ['Comment savez-vous quels clients viennent de moi ?', 'Grâce à votre code ambassadeur personnel, que le client indique à son inscription.'],
-  ['Est-ce un emploi salarié ?', 'Non. Vous êtes ambassadeur indépendant, payé à la commission et libre de vos horaires. Les meilleurs sont prioritaires quand UNUSUALL recrute des commerciaux salariés.']
+  ['Faut-il de l\x27expérience ?', 'Non. L\x27envie de convaincre suffit, on vous forme.'],
+  ['Dois-je payer quelque chose ?', 'Non. Tout est gratuit : compte, formation et kit.'],
+  ['Comment suis-je payé ?', 'Chaque mois, par Mobile Money. Tout est visible dans votre espace.'],
+  ['Comment savez-vous que le client vient de moi ?', 'Grâce à votre code ambassadeur, que le client donne à son inscription.'],
+  ['Puis-je représenter plusieurs produits ?', 'Oui. Epicure est ouvert, les autres arrivent bientôt.'],
+  ['Est-ce un emploi salarié ?', 'Non, vous êtes indépendant. Mais les meilleurs sont recrutés en priorité.']
 ];
 PAGES.push({
   file: 'postuler.html',
@@ -406,8 +384,8 @@ PAGES.push({
           <div class="ep-hero">
             <div class="pg-copy">
               <p class="pg-eyebrow">Candidature</p>
-              <h1 class="pg-title">Prêt à représenter <span class="flame-text">UNUSUALL ?</span></h1>
-              <p class="pg-lead">Créez votre compte en une minute, puis remplissez votre candidature. Nous vous répondons sous 72 heures, et votre compte devient votre espace ambassadeur.</p>
+              <h1 class="pg-title">Rejoignez <span class="flame-text">l'équipe.</span></h1>
+              <p class="pg-lead">Créez votre compte, remplissez votre candidature. Réponse sous 72 heures.</p>
               <div class="pg-cta">
                 <a class="btn btn--primary" href="connexion.html?mode=inscription">Créer mon compte et postuler →</a>
                 <a class="btn btn--ghost" href="connexion.html">J'ai déjà un compte</a>
@@ -420,8 +398,8 @@ PAGES.push({
             <div class="ep-head" data-ep-reveal><h2>En 3 étapes</h2></div>
             <ol class="ep-steps" data-ep-stagger>
               <li><strong>Créez votre compte</strong><span>Avec votre e-mail et un mot de passe.</span></li>
-              <li><strong>Postulez</strong><span>Vos coordonnées, vos produits et votre façon de faire connaître nos solutions.</span></li>
-              <li><strong>Suivez tout dans votre espace</strong><span>Statut de la candidature, puis votre code, vos clients et vos gains.</span></li>
+              <li><strong>Postulez</strong><span>En deux minutes.</span></li>
+              <li><strong>Suivez vos gains</strong><span>Code, clients et paiements dans votre espace.</span></li>
             </ol>
           </div>
 
@@ -447,7 +425,7 @@ PAGES.push({
             <div class="pg-copy">
               <p class="pg-eyebrow">Espace ambassadeur</p>
               <h1 class="pg-title">Votre espace <span class="flame-text">ambassadeur</span></h1>
-              <p class="pg-lead">Un seul compte pour postuler, puis suivre votre code, vos clients, vos gains et vos versements.</p>
+              <p class="pg-lead">Un seul compte pour postuler, puis suivre vos gains.</p>
               ${CHECK(['Gratuit', 'Vos données ne sont visibles que par vous et UNUSUALL', 'Accessible sur téléphone et ordinateur'])}
             </div>
             <div class="pg-card">
