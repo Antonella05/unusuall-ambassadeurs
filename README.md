@@ -22,10 +22,11 @@ Les pages sont générées par `scripts/build-pages.mjs`, qui contient le cadre 
 node scripts/build-pages.mjs
 ```
 
-- `assets/css/site.css` : copie du style de unusuall.online (ne pas modifier ici ; la recopier depuis le site si son style évolue).
-- `assets/css/ambassadeurs.css` : les éléments propres à la plateforme.
+- `src/site.css` : copie du style de unusuall.online (la recopier depuis le site si son style évolue).
+- `src/ambassadeurs.css` : les éléments propres à la plateforme.
+- `assets/css/app.css` : fichier final, généré par `node scripts/build-css.mjs` (règles inutilisées retirées, compressé). Ne pas le modifier à la main.
 - `assets/js/app.js` : thème, horloge, dock, apparitions, simulateur et formulaire.
-- Après une modification du CSS ou du JS, augmenter `V` dans `scripts/build-pages.mjs` puis régénérer.
+- Après une modification des pages ou de `src/`, relancer `node scripts/build-css.mjs` (le nettoyage dépend des classes utilisées dans les pages), puis augmenter `V` dans `scripts/build-pages.mjs` et régénérer les pages.
 
 **Ajouter un produit** : dans `scripts/build-pages.mjs`, passer sa carte de « Bientôt » à « Ouvert » (pages Programme et Produits), ajouter son tableau dans Gains, et activer sa case dans le formulaire de Postuler.
 

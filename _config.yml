@@ -1,0 +1,5 @@
+# GitHub Pages : ne publier que le site, pas les fichiers de construction
+exclude:
+  - src
+  - scripts
+  - README.md

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '2';
+const V = '3';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -65,7 +65,7 @@ function page({ file, title, desc, windowTitle, back, body, jsonld }) {
   <meta property="og:url" content="${url}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:image" content="${ORIGIN}/assets/img/og.png">
+  <meta property="og:image" content="${ORIGIN}/assets/img/og.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
@@ -76,8 +76,7 @@ function page({ file, title, desc, windowTitle, back, body, jsonld }) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script>try{if(localStorage.getItem('unusuall-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
-  <link rel="stylesheet" href="assets/css/site.css?v=${V}">
-  <link rel="stylesheet" href="assets/css/ambassadeurs.css?v=${V}">
+  <link rel="stylesheet" href="assets/css/app.css?v=${V}">
   <script src="assets/js/app.js?v=${V}" defer></script>
   <script type="application/ld+json">
   ${ld}
