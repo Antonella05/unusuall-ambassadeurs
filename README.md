@@ -1,27 +1,41 @@
-# Ambassadeurs Epicure · UNUSUALL
+# Ambassadeurs UNUSUALL
 
-Plateforme du programme Ambassadeurs Epicure : présentation de l'offre (gains, avantages, niveaux, charte, FAQ) et formulaire de candidature.
+Plateforme du programme Ambassadeurs UNUSUALL : les ambassadeurs choisissent les produits qu'ils représentent (Epicure pour l'instant ; Suite SOFIA et OMI à venir), découvrent leurs gains et avantages, et postulent.
 
-Site statique, sans dépendance : `index.html`, `assets/style.css`, `assets/app.js`, images dans `assets/img/`.
+Même canevas et même style que [unusuall.online](https://unusuall.online) : barre du haut, dock, fenêtre, pied de page et barre mobile.
 
-## Adresse prévue
+## Pages
 
-`https://ambassadeurs.unusuall.online` (déclarée dans le fichier `CNAME`, les balises `canonical` et `og:url`, `robots.txt` et `sitemap.xml`). Pour changer d'adresse, remplacer ces cinq occurrences.
+| Fichier | Contenu |
+|---|---|
+| `index.html` | Le programme : accroche, chiffres clés, 4 étapes, produits |
+| `produits.html` | Les produits à représenter (Epicure ouvert, les autres bientôt) |
+| `gains.html` | Règles de commission, tableau Epicure, simulateur |
+| `avantages.html` | Avantages, 3 niveaux, charte |
+| `postuler.html` | Formulaire de candidature et FAQ |
 
-## Mise en ligne avec GitHub Pages
+## Modifier le contenu
 
-1. Créer un dépôt sur GitHub (par exemple `unusuall-ambassadeurs`) et y pousser ce dossier.
-2. Dans le dépôt : **Settings → Pages → Build and deployment → Source : Deploy from a branch**, branche `main`, dossier `/ (root)`.
-3. Toujours dans **Pages**, champ **Custom domain** : `ambassadeurs.unusuall.online` (déjà présent grâce au fichier `CNAME`).
-4. Chez LWS, dans la zone DNS de `unusuall.online`, ajouter un enregistrement **CNAME** : nom `ambassadeurs`, valeur `<votre-compte-github>.github.io.`
-5. Une fois le DNS propagé (quelques minutes à quelques heures), cocher **Enforce HTTPS** dans les réglages Pages.
+Les pages sont générées par `scripts/build-pages.mjs`, qui contient le cadre commun et le texte de chaque page. Après une modification :
 
-## Formulaire de candidature
+```bash
+node scripts/build-pages.mjs
+```
 
-Les candidatures passent par Formspree (`https://formspree.io/f/xzdqanqq`, le même formulaire que la page Contact d'unusuall.online), avec l'objet « [Ambassadeur Epicure] Nouvelle candidature ». Si ce formulaire Formspree limite les domaines autorisés, ajouter `ambassadeurs.unusuall.online` dans ses réglages.
+- `assets/css/site.css` : copie du style de unusuall.online (ne pas modifier ici ; la recopier depuis le site si son style évolue).
+- `assets/css/ambassadeurs.css` : les éléments propres à la plateforme.
+- `assets/js/app.js` : thème, horloge, dock, apparitions, simulateur et formulaire.
+- Après une modification du CSS ou du JS, augmenter `V` dans `scripts/build-pages.mjs` puis régénérer.
 
-## Modifier les montants
+**Ajouter un produit** : dans `scripts/build-pages.mjs`, passer sa carte de « Bientôt » à « Ouvert » (pages Programme et Produits), ajouter son tableau dans Gains, et activer sa case dans le formulaire de Postuler.
 
-Les prix des formules et les taux (30 % puis 10 % du 3e au 12e mois) apparaissent dans `index.html` (tableau, chiffres clés, encadrés) et dans `assets/app.js` (objet `PLANS` du simulateur).
+## Formulaire
 
-Après une modification du CSS ou du JS, augmenter le numéro `?v=` dans `index.html`.
+Les candidatures passent par Formspree (`https://formspree.io/f/xzdqanqq`, le même formulaire que la page Contact d'unusuall.online), avec l'objet « [Ambassadeur UNUSUALL] Nouvelle candidature ». Si ce formulaire limite les domaines autorisés, y ajouter `ambassadeurs.unusuall.online`.
+
+## Mise en ligne (GitHub Pages)
+
+1. Dans le dépôt GitHub : **Settings → Pages → Source : Deploy from a branch**, branche `main`, dossier `/ (root)`.
+2. **Custom domain** : `ambassadeurs.unusuall.online` (déjà dans le fichier `CNAME`).
+3. Chez LWS, zone DNS de `unusuall.online` : ajouter un **CNAME** nommé `ambassadeurs` pointant vers `<compte-github>.github.io.`
+4. Une fois le DNS actif, cocher **Enforce HTTPS**.
