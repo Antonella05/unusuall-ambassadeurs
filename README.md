@@ -32,7 +32,7 @@ node scripts/build-pages.mjs
 
 ## Formulaire
 
-Les candidatures passent par Formspree (`https://formspree.io/f/xzdqanqq`, le même formulaire que la page Contact d'unusuall.online), avec l'objet « [Ambassadeur UNUSUALL] Nouvelle candidature ». Si ce formulaire limite les domaines autorisés, y ajouter `ambassadeurs.unusuall.online`.
+Les candidatures sont enregistrées dans Firestore (voir « Comptes ») et déclenchent une alerte e-mail via Formspree, objet « [Ambassadeur UNUSUALL] Nouvelle candidature ». Si ce formulaire limite les domaines autorisés, y ajouter `ambassadeurs.unusuall.online`.
 
 ## Mise en ligne (GitHub Pages)
 
@@ -40,3 +40,19 @@ Les candidatures passent par Formspree (`https://formspree.io/f/xzdqanqq`, le m�
 2. **Custom domain** : `ambassadeurs.unusuall.online` (déjà dans le fichier `CNAME`).
 3. Chez LWS, zone DNS de `unusuall.online` : ajouter un **CNAME** nommé `ambassadeurs` pointant vers `<compte-github>.github.io.`
 4. Une fois le DNS actif, cocher **Enforce HTTPS**.
+
+## Comptes (Firebase)
+
+Projet Firebase : `unusuall-ambassadeurs` (formule gratuite Spark), base Firestore en `europe-west1`.
+
+- `connexion.html` : connexion, création de compte (e-mail et mot de passe), mot de passe oublié.
+- `espace.html` : candidature, puis statut ; une fois validé, code ambassadeur, clients, gains et versements.
+- `admin.html` (non référencée) : valider ou refuser les candidatures, attribuer les codes, ajouter les clients, compter les mois payés, enregistrer les versements.
+- `assets/js/account.js` : tout le code des comptes. Firebase n'est chargé que sur ces trois pages.
+- `firestore.rules` : règles de sécurité, à recopier dans la console (Firestore → Règles → Publier) après toute modification.
+
+Calcul des gains : 30 % du 1er mois payé, puis 10 % de chaque mois payé suivant, plafonné à 10 mois (le 2e mois est offert au client).
+
+**Donner l'accès administrateur** : créer un compte sur la plateforme, puis dans la console Firebase → Firestore → créer la collection `admins` avec un document dont l'identifiant est l'UID du compte (visible dans Authentication → Utilisateurs). Aucun champ n'est nécessaire.
+
+Les candidatures envoient aussi une alerte e-mail via Formspree (`https://formspree.io/f/xzdqanqq`).

@@ -3,3 +3,4 @@ exclude:
   - src
   - scripts
   - README.md
+  - firestore.rules

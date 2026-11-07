@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Ambassadeurs UNUSUALL — règles de sécurité Firestore
+// - Chaque ambassadeur ne lit que ses propres données.
+// - Il crée sa candidature (statut « pending », sans code) et ne peut modifier
+//   que ses coordonnées : ni son statut, ni son code, ni ses clients, ni ses versements.
+// - Les administrateurs (documents admins/{uid}, créés à la main dans la console)
+//   lisent tout, valident les candidatures et gèrent clients et versements.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function profileOk(d) {
+      return str(d.nom, 2, 100) && str(d.whatsapp, 6, 30) && str(d.ville, 2, 80)
+        && str(d.profil, 2, 60) && str(d.methode, 2, 2000) && str(d.reseaux, 0, 300)
+        && d.produits is list && d.produits.size() >= 1 && d.produits.size() <= 10
+        && d.produitsFuturs is list && d.produitsFuturs.size() <= 10;
+    }
+    function allowedKeys() {
+      return ['nom', 'whatsapp', 'email', 'ville', 'profil', 'methode', 'reseaux',
+              'produits', 'produitsFuturs', 'charte', 'status', 'code', 'createdAt', 'updatedAt'];
+    }
+
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /ambassadors/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(allowedKeys())
+        && profileOk(request.resource.data)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.charte == true
+        && request.resource.data.status == 'pending'
+        && request.resource.data.code == null
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['nom', 'whatsapp', 'ville', 'profil', 'methode', 'reseaux', 'produits', 'produitsFuturs', 'updatedAt'])
+            && profileOk(request.resource.data));
+
+      allow delete: if isAdmin();
+
+      // Clients et versements : lus par l'ambassadeur, écrits par l'administration seulement
+      match /{sub}/{docId} {
+        allow read: if (sub == 'clients' || sub == 'payouts') && (isOwner(uid) || isAdmin());
+        allow write: if (sub == 'clients' || sub == 'payouts') && isAdmin();
+      }
+    }
+  }
+}
