@@ -34,7 +34,7 @@ const PAGE = document.body.dataset.account;
 const DEFAULT_SETTINGS = {
   firstPct: 30, recurringPct: 10, offeredMonth: 2, maxMonths: 12,
   validationDays: 7, closingDay: 28, paymentDay: 5,
-  epicureUrl: 'https://unusuall.online/epicure.html'
+  epicureUrl: 'https://app.epicure.unusuall.online'
 };
 
 /* ───────── Outils ───────── */

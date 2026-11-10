@@ -13,7 +13,7 @@ const ALLOWED_ORIGINS = ['https://ambassadeurs.unusuall.online', 'http://127.0.0
 const DEFAULT_SETTINGS = {
   firstPct: 30, recurringPct: 10, offeredMonth: 2, maxMonths: 12,
   validationDays: 7, closingDay: 28, paymentDay: 5,
-  epicureUrl: 'https://unusuall.online/epicure.html'
+  epicureUrl: 'https://app.epicure.unusuall.online'
 };
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -152,27 +152,41 @@ function commissionFor(amount, moisIndex, settings) {
 }
 
 /* ───────── /go : lien personnel ───────── */
-async function go(url, fs) {
+/* Les aperçus de liens (WhatsApp, Facebook, etc.) et le prefetch du navigateur
+   déclenchent plusieurs requêtes pour un seul clic humain : on ignore les robots
+   et on déduplique les requêtes rapprochées d'un même navigateur (cookie 60 s). */
+const BOT_RE = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|twitterbot|linkedinbot|slackbot|discordbot|preview|embedly|quora|pinterest|curl|wget|python-requests|node-fetch|headless|lighthouse|pingdom|uptimerobot|monitor/i;
+async function go(url, fs, request) {
   const code = str(url.searchParams.get('a') || url.searchParams.get('ref') || url.searchParams.get('amb')).toUpperCase();
   const settings = await getSettings(fs);
   let target;
   try { target = new URL(settings.epicureUrl); } catch { target = new URL(DEFAULT_SETTINGS.epicureUrl); }
+  const headers = { Location: target.toString() };
   if (/^[A-Z0-9]{4,16}$/.test(code)) {
     const ambassador = await findByCode(fs, code);
     if (ambassador) {
-      await fs.commit([{
-        transform: {
-          document: docName(`ambassadors/${ambassador.id}`),
-          fieldTransforms: [
-            { fieldPath: 'clicks', increment: { integerValue: '1' } },
-            { fieldPath: 'lastClickAt', setToServerValue: 'REQUEST_TIME' }
-          ]
-        }
-      }]);
+      const ua = request.headers.get('User-Agent') || '';
+      const cookies = request.headers.get('Cookie') || '';
+      const seen = cookies.split(';').some((c) => c.trim() === `ambclk_${code}=1`);
+      if (!BOT_RE.test(ua) && !seen) {
+        await fs.commit([{
+          transform: {
+            document: docName(`ambassadors/${ambassador.id}`),
+            fieldTransforms: [
+              { fieldPath: 'clicks', increment: { integerValue: '1' } },
+              { fieldPath: 'lastClickAt', setToServerValue: 'REQUEST_TIME' }
+            ]
+          }
+        }]);
+      }
+      if (!BOT_RE.test(ua)) {
+        headers['Set-Cookie'] = `ambclk_${code}=1; Max-Age=60; Path=/; SameSite=Lax; Secure`;
+      }
       target.searchParams.set('amb', code);
+      headers.Location = target.toString();
     }
   }
-  return Response.redirect(target.toString(), 302);
+  return new Response(null, { status: 302, headers });
 }
 
 /* ───────── /qr : QR code SVG du lien ───────── */
@@ -582,7 +596,7 @@ export default {
       : {};
     try {
       const fs = new Firestore(env);
-      if (url.pathname === '/go') return await go(url, fs);
+      if (url.pathname === '/go') return await go(url, fs, request);
       if (url.pathname === '/qr') return qr(url);
       if (url.pathname === '/search') return await search(url, fs);
       if (url.pathname === '/webhook') return await webhook(request, env, fs);
