@@ -3,9 +3,10 @@ rules_version = '2';
 // Ambassadeurs UNUSUALL — règles de sécurité Firestore
 // - Chaque ambassadeur ne lit que ses propres données.
 // - Il crée sa candidature (statut « pending », sans code) et ne peut modifier
-//   que ses coordonnées : ni son statut, ni son code, ni ses clients, ni ses versements.
+//   que ses coordonnées : ni son statut, ni son code, ni ses gains.
 // - Les administrateurs (documents admins/{uid}, créés à la main dans la console)
-//   lisent tout, valident les candidatures et gèrent clients et versements.
+//   lisent tout, valident les candidatures et gèrent le suivi.
+// - Les événements Epicure arrivent par Cloud Functions (Admin SDK), jamais par le client.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -30,6 +31,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /settings/platform {
+      allow read, write: if isAdmin();
+    }
+
     match /ambassadors/{uid} {
       allow read: if isOwner(uid) || isAdmin();
 
@@ -50,7 +55,21 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
 
-      // Clients et versements : lus par l'ambassadeur, écrits par l'administration seulement
+      // Suivi Epicure : lu par l'ambassadeur, écrit par l'administration ou les Cloud Functions.
+      match /restaurants/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isAdmin();
+      }
+      match /payments/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isAdmin();
+      }
+      match /commissions/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isAdmin();
+      }
+
+      // Clients historiques et versements : lus par l'ambassadeur, écrits par l'administration seulement.
       match /{sub}/{docId} {
         allow read: if (sub == 'clients' || sub == 'payouts') && (isOwner(uid) || isAdmin());
         allow write: if (sub == 'clients' || sub == 'payouts') && isAdmin();

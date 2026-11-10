@@ -1,15 +1,15 @@
-/* UNUSUALL Ambassadeurs — comptes (Firebase Auth + Firestore)
+/* UNUSUALL Ambassadeurs — comptes (Firebase Auth + Firestore + Functions)
    Pages : connexion.html (login/inscription/mot de passe oublié),
-           espace.html (candidature, statut, tableau de bord),
-           admin.html (validation, clients, versements). */
+           espace.html (candidature, statut, tableau de bord, lien et QR code),
+           admin.html (candidatures, suivi des liens, récapitulatif, réglages). */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendPasswordResetEmail, signOut, updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc,
-  serverTimestamp, increment, Timestamp
+  getFirestore, doc, getDoc, setDoc, updateDoc, collection, collectionGroup, getDocs,
+  serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const app = initializeApp({
@@ -25,8 +25,17 @@ auth.languageCode = 'fr';
 const db = getFirestore(app);
 
 const FORMSPREE = 'https://formspree.io/f/xzdqanqq';
-const PLANS = { Standard: 27900, Premium: 45900, Ultra: 79900 };
+/* Backend gratuit : Worker Cloudflare (worker/index.js), pas de Cloud Functions. */
+const FUNCTIONS_ORIGIN = 'https://unusuall-ambassadeurs.antonellatamadaho.workers.dev';
 const PAGE = document.body.dataset.account;
+
+/* Réglages par défaut (miroir de worker/index.js) — l'espace ambassadeur les
+   utilise pour l'affichage ; seuls les admins lisent settings/platform. */
+const DEFAULT_SETTINGS = {
+  firstPct: 30, recurringPct: 10, offeredMonth: 2, maxMonths: 12,
+  validationDays: 7, closingDay: 28, paymentDay: 5,
+  epicureUrl: 'https://unusuall.online/epicure.html'
+};
 
 /* ───────── Outils ───────── */
 const $ = (s, c = document) => c.querySelector(s);
@@ -34,6 +43,13 @@ const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fcfa = (n) => Math.round(n || 0).toLocaleString('fr-FR').replace(/\s/g, ' ') + ' FCFA';
 const dateFr = (t) => (t && t.toDate ? t.toDate() : t ? new Date(t) : null)?.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) || '—';
+const monthKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const periodLabel = (p) => {
+  const [y, m] = String(p || '').split('-').map(Number);
+  return y && m ? new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '—';
+};
+const referralLink = (code) => `${FUNCTIONS_ORIGIN}/go?a=${encodeURIComponent(code || '')}`;
+const qrLink = (code) => `${FUNCTIONS_ORIGIN}/qr?a=${encodeURIComponent(code || '')}`;
 
 const ERRORS = {
   'auth/invalid-email': "Cette adresse e-mail n'est pas valide.",
@@ -45,9 +61,15 @@ const ERRORS = {
   'auth/weak-password': 'Le mot de passe doit contenir au moins 8 caractères.',
   'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
   'auth/network-request-failed': 'Connexion internet impossible. Vérifiez votre réseau.',
-  'permission-denied': "Action non autorisée. Reconnectez-vous puis réessayez."
+  'permission-denied': 'Action non autorisée. Reconnectez-vous puis réessayez.',
+  'unauthenticated': 'Session expirée. Reconnectez-vous puis réessayez.',
+  'failed-precondition': 'Aucune commission payable sur cette période.',
+  'not-found': 'Élément introuvable. Rechargez la page puis réessayez.',
+  'invalid-argument': 'Informations manquantes ou invalides.'
 };
-const errText = (e) => ERRORS[e?.code] || "Une erreur est survenue. Réessayez dans un instant.";
+const errText = (e) => ERRORS[e?.code] || ERRORS[String(e?.code || '').replace('functions/', '')]
+  || (String(e?.code || '').startsWith('functions/') && e?.message)
+  || 'Une erreur est survenue. Réessayez dans un instant.';
 
 function busy(btn, on, label) {
   if (!btn) return;
@@ -55,14 +77,31 @@ function busy(btn, on, label) {
   else { btn.disabled = false; btn.textContent = btn.dataset.label || btn.textContent; }
 }
 function show(el, msg) { if (!el) return; el.textContent = msg; el.hidden = !msg; }
+async function copyBtn(btn, text, okLabel) {
+  const label = btn.textContent;
+  try { await navigator.clipboard.writeText(text); btn.textContent = okLabel; }
+  catch { btn.textContent = text; }
+  setTimeout(() => { btn.textContent = label; }, 2200);
+}
 
-/* Commission d'un client : 30 % du 1er mois payé, puis 10 % des mois payés suivants
-   (le 2e mois est offert au client, donc les mois payés 2 à 11 = mois 3 à 12), plafonné à 10. */
-function commission(c) {
-  const price = Number(c.prix) || PLANS[c.formule] || 0;
-  const paid = Math.max(0, Number(c.moisPayes) || 0);
-  if (!paid) return 0;
-  return price * 0.3 + price * 0.1 * Math.min(paid - 1, 10);
+const COMMISSION_LABEL = { pending: 'En attente', payable: 'Payable', paid: 'Payé', cancelled: 'Annulé' };
+const RESTAURANT_LABEL = { inscrit: 'Inscrit', abonne: 'Abonné', resilie: 'Résilié' };
+
+/* Une commission devient « payable » une fois le délai de validation écoulé. */
+function commissionState(c) {
+  if (c.statut === 'paid' || c.statut === 'cancelled') return c.statut;
+  const due = c.payableAt?.toMillis ? c.payableAt.toMillis() : c.payableAt ? new Date(c.payableAt).getTime() : 0;
+  return due && due <= Date.now() ? 'payable' : 'pending';
+}
+function commissionTotals(list) {
+  const t = { pending: 0, payable: 0, paid: 0, cancelled: 0 };
+  for (const c of list) t[commissionState(c)] += Number(c.montant) || 0;
+  return { ...t, earned: t.pending + t.payable + t.paid };
+}
+function restaurantGains(restaurantId, commissions) {
+  return commissions
+    .filter((c) => c.restaurantId === restaurantId && c.statut !== 'cancelled')
+    .reduce((s, c) => s + (Number(c.montant) || 0), 0);
 }
 function level(active) { return active >= 15 ? 'Ambassadeur Élite' : active >= 5 ? 'Ambassadeur Confirmé' : 'Ambassadeur'; }
 
@@ -154,7 +193,7 @@ if (PAGE === 'space') {
         <h2>${rejected ? 'Merci pour votre candidature.' : 'Votre candidature est bien reçue.'}</h2>
         <p>${rejected
           ? 'Elle n\'a pas été retenue cette fois. Vous pourrez repostuler lors de l\'ouverture de nouveaux produits. Une question ? Écrivez-nous à services@unusuall.online.'
-          : 'Nous l\'étudions et vous répondons sous 72 heures, par WhatsApp ou par e-mail. Dès sa validation, votre code ambassadeur et votre tableau de bord apparaîtront ici.'}</p>
+          : 'Nous l\'étudions et vous répondons sous 72 heures, par WhatsApp ou par e-mail. Dès sa validation, votre lien personnel, votre QR code et votre tableau de bord apparaîtront ici.'}</p>
         <dl class="amb-summary">
           <div><dt>Envoyée le</dt><dd>${esc(dateFr(a.createdAt))}</dd></div>
           <div><dt>Produits</dt><dd>${esc((a.produits || []).join(', '))}</dd></div>
@@ -212,63 +251,86 @@ if (PAGE === 'space') {
   }
 
   async function showDashboard(user, a) {
-    const [cs, ps] = await Promise.all([
-      getDocs(collection(db, 'ambassadors', user.uid, 'clients')),
+    const [rs, ps, cs, vs] = await Promise.all([
+      getDocs(collection(db, 'ambassadors', user.uid, 'restaurants')),
+      getDocs(collection(db, 'ambassadors', user.uid, 'payments')),
+      getDocs(collection(db, 'ambassadors', user.uid, 'commissions')),
       getDocs(collection(db, 'ambassadors', user.uid, 'payouts'))
     ]);
-    const clients = cs.docs.map((d) => d.data()).sort((x, y) => (y.dateSignature?.seconds || 0) - (x.dateSignature?.seconds || 0));
-    const payouts = ps.docs.map((d) => d.data()).sort((x, y) => (y.date?.seconds || 0) - (x.date?.seconds || 0));
-    const active = clients.filter((c) => c.statut !== 'resilie').length;
-    const earned = clients.reduce((s, c) => s + commission(c), 0);
-    const paid = payouts.reduce((s, p) => s + (Number(p.montant) || 0), 0);
+    const restaurants = rs.docs.map((d) => d.data()).sort((x, y) => (y.createdAt?.seconds || 0) - (x.createdAt?.seconds || 0));
+    const payments = ps.docs.map((d) => d.data());
+    const commissions = cs.docs.map((d) => d.data());
+    const payouts = vs.docs.map((d) => d.data()).sort((x, y) => (y.date?.seconds || 0) - (x.date?.seconds || 0));
+    const inscrits = restaurants.filter((r) => r.statut !== 'resilie').length;
+    const abonnes = restaurants.filter((r) => r.statut === 'abonne').length;
+    const totals = commissionTotals(commissions);
+    const link = referralLink(a.code);
+    const waText = `Je vous recommande Epicure, le logiciel qui aide les restaurants à ne plus perdre d'argent. Découvrez-le ici : ${link}`;
 
     root.innerHTML = `
-      <div class="amb-code">
+      <div class="amb-code amb-share">
         <div>
-          <small>Votre code ambassadeur</small>
+          <small>Votre lien personnel</small>
           <b id="my-code">${esc(a.code || '—')}</b>
-          <span>À donner à chaque client lors de son inscription.</span>
+          <span class="amb-link-url" id="my-link">${esc(link)}</span>
+          <span>Partagez ce lien ou votre QR code : chaque clic, inscription et paiement est compté automatiquement.</span>
         </div>
-        <button type="button" class="btn btn--primary" id="copy-code">Copier le code</button>
+        <div class="amb-share__acts">
+          <button type="button" class="btn btn--primary" id="copy-link">Copier le lien</button>
+          <a class="btn btn--ghost" href="https://wa.me/?text=${encodeURIComponent(waText)}" target="_blank" rel="noopener">Partager sur WhatsApp</a>
+          <button type="button" class="btn btn--ghost" id="show-qr">Mon QR code</button>
+        </div>
       </div>
 
+      <dialog id="qr-dialog" class="amb-qr">
+        <img src="${esc(qrLink(a.code))}" alt="QR code de votre lien ambassadeur" width="240" height="240">
+        <p>${esc(link)}</p>
+        <small>Faites scanner ce QR code ou enregistrez l'image pour l'imprimer.</small>
+        <button type="button" class="btn btn--primary amb-qr__close" id="close-qr">Fermer</button>
+      </dialog>
+
       <ul class="ep-stats amb-kpis">
-        <li><b>${active}</b><span>client${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''}</span></li>
-        <li><b>${esc(fcfa(earned))}</b><span>gagnés à ce jour</span></li>
-        <li><b>${esc(fcfa(paid))}</b><span>déjà versés</span></li>
-        <li><b>${esc(fcfa(Math.max(0, earned - paid)))}</b><span>à recevoir</span></li>
+        <li><b>${Number(a.clicks) || 0}</b><span>clic${(Number(a.clicks) || 0) > 1 ? 's' : ''} sur votre lien</span></li>
+        <li><b>${inscrits}</b><span>restaurant${inscrits > 1 ? 's' : ''} inscrit${inscrits > 1 ? 's' : ''}</span></li>
+        <li><b>${abonnes}</b><span>abonné${abonnes > 1 ? 's' : ''}</span></li>
+        <li><b>${esc(fcfa(totals.pending))}</b><span>en attente</span></li>
+        <li><b>${esc(fcfa(totals.payable))}</b><span>payable</span></li>
+        <li><b>${esc(fcfa(totals.paid))}</b><span>déjà versés</span></li>
       </ul>
 
-      <p class="amb-level-line"><span class="pg-pill pg-pill--live"><i></i>${esc(level(active))}</span> Produits : ${esc((a.produits || []).join(', '))}</p>
+      <p class="amb-level-line"><span class="pg-pill pg-pill--live"><i></i>${esc(level(abonnes))}</span> Produits : ${esc((a.produits || []).join(', '))}</p>
 
       <section class="amb-block">
-        <h2>Vos clients</h2>
-        ${clients.length ? `<div class="amb-table"><table>
-          <thead><tr><th scope="col">Client</th><th scope="col">Produit</th><th scope="col">Formule</th><th scope="col">Inscrit le</th><th scope="col">Mois payés</th><th scope="col">Vos gains</th></tr></thead>
-          <tbody>${clients.map((c) => `<tr${c.statut === 'resilie' ? ' class="is-off"' : ''}><th scope="row">${esc(c.client)}</th><td>${esc(c.produit)}</td><td>${esc(c.formule)}</td><td>${esc(dateFr(c.dateSignature))}</td><td>${esc(c.moisPayes || 0)}</td><td><b>${esc(fcfa(commission(c)))}</b></td></tr>`).join('')}</tbody>
-        </table></div>` : '<p class="amb-empty">Pas encore de client. Partagez votre code : chaque restaurant qui s\'abonne avec lui apparaîtra ici.</p>'}
+        <h2>Vos restaurants</h2>
+        ${restaurants.length ? `<div class="amb-table"><table>
+          <thead><tr><th scope="col">Restaurant</th><th scope="col">Formule</th><th scope="col">Inscrit le</th><th scope="col">Statut</th><th scope="col">Mois payés</th><th scope="col">Vos gains</th></tr></thead>
+          <tbody>${restaurants.map((r) => {
+            const paidMonths = payments.filter((p) => p.restaurantId === r.restaurantId && p.statut === 'encaisse').length;
+            return `<tr${r.statut === 'resilie' ? ' class="is-off"' : ''}><th scope="row">${esc(r.nom || r.restaurantId)}</th><td>${esc(r.formule || '—')}</td><td>${esc(dateFr(r.createdAt))}</td><td>${esc(RESTAURANT_LABEL[r.statut] || r.statut)}</td><td>${paidMonths}</td><td><b>${esc(fcfa(restaurantGains(r.restaurantId, commissions)))}</b></td></tr>`;
+          }).join('')}</tbody>
+        </table></div>` : '<p class="amb-empty">Pas encore de restaurant. Partagez votre lien : chaque restaurant qui s\'inscrit avec lui apparaîtra ici, et ses paiements mettront vos gains à jour automatiquement.</p>'}
       </section>
 
       <section class="amb-block">
         <h2>Vos versements</h2>
-        ${payouts.length ? `<ul class="amb-payouts">${payouts.map((p) => `<li><span>${esc(dateFr(p.date))}${p.note ? ' · ' + esc(p.note) : ''}</span><b>${esc(fcfa(p.montant))}</b></li>`).join('')}</ul>`
+        ${payouts.length ? `<ul class="amb-payouts">${payouts.map((p) => `<li><span>${esc(dateFr(p.date))}${p.period ? ' · ' + esc(periodLabel(p.period)) : ''}${p.note ? ' · ' + esc(p.note) : ''}</span><b>${esc(fcfa(p.montant))}</b></li>`).join('')}</ul>`
           : '<p class="amb-empty">Aucun versement pour le moment. Vos commissions sont versées chaque mois par Mobile Money.</p>'}
       </section>
 
       <section class="amb-block amb-kit">
         <h2>Votre kit</h2>
-        <p>Visuels, argumentaire et vidéos vous sont envoyés par WhatsApp après la formation. Pour présenter Epicure, appuyez-vous aussi sur sa page officielle.</p>
+        <p>Votre lien et votre QR code sont en haut de page. Visuels, argumentaire et vidéos vous sont envoyés par WhatsApp après la formation. Pour présenter Epicure, appuyez-vous aussi sur sa page officielle.</p>
         <div class="pg-cta">
-          <a class="btn btn--ghost" href="https://unusuall.online/epicure.html" target="_blank" rel="noopener">Page Epicure ↗</a>
+          <a class="btn btn--ghost" href="${esc(DEFAULT_SETTINGS.epicureUrl)}" target="_blank" rel="noopener">Page Epicure ↗</a>
           <a class="btn btn--ghost" href="gains.html">Rappel des gains</a>
           <a class="btn btn--ghost" href="avantages.html">La charte</a>
         </div>
       </section>`;
 
-    $('#copy-code').addEventListener('click', async (e) => {
-      try { await navigator.clipboard.writeText(a.code || ''); e.target.textContent = 'Code copié'; }
-      catch { e.target.textContent = a.code || ''; }
-    });
+    $('#copy-link').addEventListener('click', (e) => copyBtn(e.currentTarget, link, 'Lien copié'));
+    $('#show-qr').addEventListener('click', () => $('#qr-dialog').showModal());
+    $('#close-qr').addEventListener('click', () => $('#qr-dialog').close());
+    $('#qr-dialog').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   }
 }
 
@@ -276,6 +338,19 @@ if (PAGE === 'space') {
 if (PAGE === 'admin') {
   const root = $('#admin');
   let people = [];
+  let settings = { ...DEFAULT_SETTINGS };
+
+  async function adminCall(action, data) {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(`${FUNCTIONS_ORIGIN}/admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action, ...data })
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw { code: out.code || 'internal', message: out.error };
+    return out;
+  }
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) return location.replace('connexion.html?next=admin.html');
@@ -291,22 +366,42 @@ if (PAGE === 'admin') {
   async function load() {
     root.innerHTML = '<p class="amb-empty">Chargement…</p>';
     try {
-      const snap = await getDocs(collection(db, 'ambassadors'));
+      const [snap, sset] = await Promise.all([
+        getDocs(collection(db, 'ambassadors')),
+        getDoc(doc(db, 'settings', 'platform')).catch(() => null)
+      ]);
       people = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((x, y) => (y.createdAt?.seconds || 0) - (x.createdAt?.seconds || 0));
-      render('pending');
+      if (sset && sset.exists()) settings = { ...DEFAULT_SETTINGS, ...sset.data() };
+      renderMain('candidates');
     } catch (ex) { root.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
   }
 
-  function render(filter) {
+  function renderMain(tab) {
+    const tabs = [['candidates', 'Candidatures'], ['links', 'Suivi des liens'], ['recap', 'Récapitulatif'], ['settings', 'Réglages']];
+    root.innerHTML = `
+      <div class="amb-tabs amb-main-tabs" role="tablist">
+        ${tabs.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}">${l}</button>`).join('')}
+      </div>
+      <div id="admin-pane"></div>`;
+    $$('[data-tab]', root).forEach((b) => b.addEventListener('click', () => renderMain(b.dataset.tab)));
+    const pane = $('#admin-pane');
+    if (tab === 'candidates') renderCandidates(pane, 'pending');
+    else if (tab === 'links') renderLinks(pane);
+    else if (tab === 'recap') renderRecap(pane);
+    else renderSettings(pane);
+  }
+
+  /* ── Candidatures ── */
+  function renderCandidates(pane, filter) {
     const count = (s) => people.filter((p) => p.status === s).length;
     const list = people.filter((p) => p.status === filter);
-    root.innerHTML = `
+    pane.innerHTML = `
       <div class="amb-tabs amb-tabs--admin" role="tablist">
         ${[['pending', 'En attente'], ['approved', 'Validés'], ['rejected', 'Refusés']].map(([k, l]) => `<button type="button" role="tab" data-filter="${k}" aria-selected="${k === filter}">${l} <span>${count(k)}</span></button>`).join('')}
       </div>
       ${list.length ? `<ul class="amb-people">${list.map(card).join('')}</ul>` : '<p class="amb-empty">Aucun ambassadeur dans cette liste.</p>'}`;
-    $$('[data-filter]', root).forEach((b) => b.addEventListener('click', () => render(b.dataset.filter)));
-    $$('[data-act]', root).forEach((b) => b.addEventListener('click', () => act(b.dataset.act, b.dataset.id, filter)));
+    $$('[data-filter]', pane).forEach((b) => b.addEventListener('click', () => renderCandidates(pane, b.dataset.filter)));
+    $$('[data-act]', pane).forEach((b) => b.addEventListener('click', () => act(b.dataset.act, b.dataset.id, pane, filter)));
   }
 
   function card(p) {
@@ -323,105 +418,219 @@ if (PAGE === 'admin') {
         <div class="is-wide"><dt>Sa méthode</dt><dd>${esc(p.methode)}</dd></div>
       </dl>
       <div class="pg-cta">
-        ${p.status !== 'approved' ? `<button type="button" class="btn btn--primary" data-act="approve" data-id="${esc(p.id)}">Valider et donner un code</button>` : `<button type="button" class="btn btn--primary" data-act="manage" data-id="${esc(p.id)}">Clients et versements</button>`}
+        ${p.status !== 'approved' ? `<button type="button" class="btn btn--primary" data-act="approve" data-id="${esc(p.id)}">Valider et créer son lien</button>` : `<button type="button" class="btn btn--primary" data-act="manage" data-id="${esc(p.id)}">Restaurants et gains</button>`}
         ${p.status !== 'rejected' ? `<button type="button" class="btn btn--ghost" data-act="reject" data-id="${esc(p.id)}">Refuser</button>` : ''}
       </div>
       <div class="amb-manage" id="m-${esc(p.id)}" hidden></div>
     </li>`;
   }
 
-  async function act(what, id, filter) {
+  function uniqueCode() {
+    const used = new Set(people.map((p) => p.code).filter(Boolean));
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let i = 0; i < 50; i++) {
+      const code = 'U' + [...crypto.getRandomValues(new Uint8Array(6))].map((b) => chars[b % chars.length]).join('');
+      if (!used.has(code)) return code;
+    }
+    return 'U' + Date.now().toString(36).toUpperCase();
+  }
+
+  async function act(what, id, pane, filter) {
     const p = people.find((x) => x.id === id);
     try {
       if (what === 'approve') {
-        const code = p.code || 'U' + Math.random().toString(36).slice(2, 7).toUpperCase();
+        const code = p.code || uniqueCode();
         await updateDoc(doc(db, 'ambassadors', id), { status: 'approved', code, updatedAt: serverTimestamp() });
         Object.assign(p, { status: 'approved', code });
-        render(filter);
+        renderCandidates(pane, filter);
       } else if (what === 'reject') {
         if (!confirm(`Refuser la candidature de ${p.nom} ?`)) return;
         await updateDoc(doc(db, 'ambassadors', id), { status: 'rejected', updatedAt: serverTimestamp() });
         p.status = 'rejected';
-        render(filter);
+        renderCandidates(pane, filter);
       } else if (what === 'manage') {
-        manage(p);
+        const box = $(`#m-${CSS.escape(p.id)}`);
+        if (!box.hidden) { box.hidden = true; return; }
+        await renderDetail(box, p);
       }
     } catch (ex) { alert(errText(ex)); }
   }
 
-  async function manage(p) {
-    const box = $(`#m-${CSS.escape(p.id)}`);
-    if (!box.hidden) { box.hidden = true; return; }
+  async function renderDetail(box, p) {
     box.hidden = false;
     box.innerHTML = '<p class="amb-empty">Chargement…</p>';
-    const [cs, ps] = await Promise.all([
-      getDocs(collection(db, 'ambassadors', p.id, 'clients')),
-      getDocs(collection(db, 'ambassadors', p.id, 'payouts'))
-    ]);
-    const clients = cs.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const payouts = ps.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const earned = clients.reduce((s, c) => s + commission(c), 0);
-    const paid = payouts.reduce((s, x) => s + (Number(x.montant) || 0), 0);
+    try {
+      const [rs, ps, cs, vs] = await Promise.all([
+        getDocs(collection(db, 'ambassadors', p.id, 'restaurants')),
+        getDocs(collection(db, 'ambassadors', p.id, 'payments')),
+        getDocs(collection(db, 'ambassadors', p.id, 'commissions')),
+        getDocs(collection(db, 'ambassadors', p.id, 'payouts'))
+      ]);
+      const restaurants = rs.docs.map((d) => d.data()).sort((x, y) => (y.createdAt?.seconds || 0) - (x.createdAt?.seconds || 0));
+      const payments = ps.docs.map((d) => d.data()).sort((x, y) => (x.date?.seconds || 0) - (y.date?.seconds || 0));
+      const commissions = cs.docs.map((d) => d.data()).sort((x, y) => (x.createdAt?.seconds || 0) - (y.createdAt?.seconds || 0));
+      const payouts = vs.docs.map((d) => d.data()).sort((x, y) => (y.date?.seconds || 0) - (x.date?.seconds || 0));
+      const totals = commissionTotals(commissions);
 
-    box.innerHTML = `
-      <p class="amb-manage__sum">Gagné : <b>${esc(fcfa(earned))}</b> · Versé : <b>${esc(fcfa(paid))}</b> · À verser : <b>${esc(fcfa(Math.max(0, earned - paid)))}</b></p>
-      <h3>Clients</h3>
-      ${clients.length ? `<ul class="amb-mini">${clients.map((c) => `<li>
-          <span><b>${esc(c.client)}</b> · ${esc(c.produit)} ${esc(c.formule)} · ${esc(c.moisPayes || 0)} mois payé(s)${c.statut === 'resilie' ? ' · résilié' : ''}</span>
-          <span class="amb-mini__acts">
-            <button type="button" data-c="pay" data-cid="${esc(c.id)}">+1 mois payé</button>
-            <button type="button" data-c="${c.statut === 'resilie' ? 'reactivate' : 'cancel'}" data-cid="${esc(c.id)}">${c.statut === 'resilie' ? 'Réactiver' : 'Résilié'}</button>
-          </span></li>`).join('')}</ul>` : '<p class="amb-empty">Aucun client.</p>'}
-      <form class="amb-inline" data-form="client">
-        <input name="client" class="form-control" placeholder="Nom du restaurant" required maxlength="120">
-        <select name="formule" class="form-control">${Object.keys(PLANS).map((k) => `<option>${k}</option>`).join('')}</select>
-        <input name="date" type="date" class="form-control" required>
-        <button class="btn btn--primary" type="submit">Ajouter le client</button>
-      </form>
-      <h3>Versements</h3>
-      ${payouts.length ? `<ul class="amb-mini">${payouts.map((x) => `<li><span>${esc(dateFr(x.date))} · <b>${esc(fcfa(x.montant))}</b>${x.note ? ' · ' + esc(x.note) : ''}</span><span class="amb-mini__acts"><button type="button" data-c="delpay" data-pid="${esc(x.id)}">Supprimer</button></span></li>`).join('')}</ul>` : '<p class="amb-empty">Aucun versement.</p>'}
-      <form class="amb-inline" data-form="payout">
-        <input name="montant" type="number" min="1" step="1" class="form-control" placeholder="Montant (FCFA)" required>
-        <input name="note" class="form-control" placeholder="Note (ex. : octobre, Mobile Money)" maxlength="120">
-        <input name="date" type="date" class="form-control" required>
-        <button class="btn btn--primary" type="submit">Enregistrer le versement</button>
+      box.innerHTML = `
+        <p class="amb-manage__sum">En attente : <b>${esc(fcfa(totals.pending))}</b> · Payable : <b>${esc(fcfa(totals.payable))}</b> · Versé : <b>${esc(fcfa(totals.paid))}</b></p>
+        <h3>Restaurants</h3>
+        ${restaurants.length ? `<ul class="amb-mini">${restaurants.map((r, i) => {
+          const rp = payments.filter((x) => x.restaurantId === r.restaurantId);
+          const rc = commissions.filter((x) => x.restaurantId === r.restaurantId);
+          const paidMonths = rp.filter((x) => x.statut === 'encaisse').length;
+          return `<li class="amb-rest">
+            <span><b>${esc(r.nom || r.restaurantId)}</b> · ${esc(r.formule || '—')} · ${esc(RESTAURANT_LABEL[r.statut] || r.statut)} · ${paidMonths} mois payé(s) · ${esc(fcfa(restaurantGains(r.restaurantId, commissions)))}${r.autoReferral ? ' <span class="amb-flag">Auto-parrainage ?</span>' : ''}</span>
+            <span class="amb-mini__acts">
+              <button type="button" data-rest-toggle="${i}">Détail</button>
+              <button type="button" data-correct="${esc(r.restaurantId)}">Corriger l'attribution</button>
+            </span>
+            <div class="amb-rest__detail" id="rd-${i}" hidden>
+              ${rp.length ? `<p>Paiements</p><ul>${rp.map((x) => `<li>Mois ${esc(x.moisIndex)} · ${esc(fcfa(x.montant))} · ${esc(dateFr(x.date))} · ${esc(x.statut)}</li>`).join('')}</ul>` : '<p>Aucun paiement.</p>'}
+              ${rc.length ? `<p>Commissions</p><ul>${rc.map((x) => `<li>Mois ${esc(x.moisIndex)} · ${esc(x.taux)} % · ${esc(fcfa(x.montant))} · ${esc(COMMISSION_LABEL[commissionState(x)])} · ${esc(periodLabel(x.period))}${x.cancelReason ? ' (' + esc(x.cancelReason) + ')' : ''}</li>`).join('')}</ul>` : '<p>Aucune commission.</p>'}
+            </div>
+          </li>`;
+        }).join('')}</ul>` : '<p class="amb-empty">Aucun restaurant pour le moment. Ils arrivent automatiquement via le lien de l\'ambassadeur.</p>'}
+        <h3>Versements</h3>
+        ${payouts.length ? `<ul class="amb-mini">${payouts.map((x) => `<li><span>${esc(dateFr(x.date))}${x.period ? ' · ' + esc(periodLabel(x.period)) : ''} · <b>${esc(fcfa(x.montant))}</b>${x.note ? ' · ' + esc(x.note) : ''}</span></li>`).join('')}</ul>` : '<p class="amb-empty">Aucun versement. Utilisez le Récapitulatif pour marquer les commissions payées.</p>'}`;
+
+      $$('[data-rest-toggle]', box).forEach((b) => b.addEventListener('click', () => {
+        const d = $(`#rd-${b.dataset.restToggle}`, box);
+        d.hidden = !d.hidden;
+      }));
+      $$('[data-correct]', box).forEach((b) => b.addEventListener('click', async () => {
+        const code = prompt('Code du bon ambassadeur pour ce restaurant ?');
+        if (!code || !code.trim()) return;
+        busy(b, true, 'Correction…');
+        try {
+          await adminCall('correctAttribution', { restaurantId: b.dataset.correct, ambassadorCode: code.trim().toUpperCase() });
+          await renderDetail(box, p);
+        } catch (ex) { alert(errText(ex)); busy(b, false); }
+      }));
+    } catch (ex) { box.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
+  }
+
+  /* ── Suivi des liens ── */
+  async function renderLinks(pane) {
+    pane.innerHTML = '<p class="amb-empty">Chargement…</p>';
+    const approved = people.filter((p) => p.status === 'approved' && p.code);
+    try {
+      const snap = await getDocs(collectionGroup(db, 'restaurants'));
+      const rests = snap.docs.map((d) => d.data());
+      pane.innerHTML = approved.length ? `<div class="amb-table"><table>
+        <thead><tr><th scope="col">Ambassadeur</th><th scope="col">Code</th><th scope="col">Lien</th><th scope="col">Clics</th><th scope="col">Inscrits</th><th scope="col">Abonnés</th></tr></thead>
+        <tbody>${approved.map((p) => {
+          const mine = rests.filter((r) => r.ambassadeurUid === p.id);
+          return `<tr><th scope="row">${esc(p.nom)}</th><td>${esc(p.code)}</td><td><button type="button" class="amb-copy" data-copy="${esc(referralLink(p.code))}">Copier</button></td><td>${Number(p.clicks) || 0}</td><td>${mine.filter((r) => r.statut !== 'resilie').length}</td><td>${mine.filter((r) => r.statut === 'abonne').length}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>` : '<p class="amb-empty">Aucun ambassadeur validé pour le moment.</p>';
+      $$('[data-copy]', pane).forEach((b) => b.addEventListener('click', () => copyBtn(b, b.dataset.copy, 'Copié')));
+    } catch (ex) { pane.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
+  }
+
+  /* ── Récapitulatif mensuel ── */
+  async function renderRecap(pane) {
+    pane.innerHTML = '<p class="amb-empty">Chargement…</p>';
+    try {
+      const snap = await getDocs(collectionGroup(db, 'commissions'));
+      const all = snap.docs.map((d) => ({ id: d.id, uid: d.ref.parent.parent.id, ...d.data() }));
+      let period = monthKey();
+
+      const draw = () => {
+        const rows = all.filter((c) => c.period === period && c.statut !== 'cancelled');
+        const groups = [];
+        for (const c of rows) {
+          let g = groups.find((x) => x.uid === c.uid);
+          if (!g) {
+            const p = people.find((x) => x.id === c.uid);
+            g = { uid: c.uid, name: p?.nom || c.uid, code: p?.code || '—', rows: [], total: 0, payable: 0 };
+            groups.push(g);
+          }
+          g.rows.push(c);
+          g.total += Number(c.montant) || 0;
+          if (commissionState(c) === 'payable') g.payable += Number(c.montant) || 0;
+        }
+        pane.innerHTML = `
+          <div class="amb-recap__filters">
+            <label for="recap-period">Période</label>
+            <input type="month" id="recap-period" class="form-control" value="${period}">
+            <button type="button" class="btn btn--ghost" id="recap-csv" ${rows.length ? '' : 'disabled'}>Exporter CSV</button>
+          </div>
+          ${groups.length ? `<div class="amb-table"><table>
+            <thead><tr><th scope="col">Ambassadeur</th><th scope="col">Restaurant</th><th scope="col">Mois</th><th scope="col">Montant</th><th scope="col">Statut</th><th scope="col">Action</th></tr></thead>
+            <tbody>${groups.map((g) => `
+              <tr class="amb-recap__head"><th scope="row">${esc(g.name)} <span>${esc(g.code)}</span></th><td></td><td></td><td><b>${esc(fcfa(g.total))}</b></td><td></td><td>${g.payable > 0 ? `<button type="button" class="amb-copy" data-paid="${esc(g.uid)}">Marquer payé (${esc(fcfa(g.payable))})</button>` : '—'}</td></tr>
+              ${g.rows.map((c) => `<tr><td></td><td>${esc(c.restaurantNom || c.restaurantId)}</td><td>${esc(c.moisIndex)}</td><td>${esc(fcfa(c.montant))}</td><td>${esc(COMMISSION_LABEL[commissionState(c)])}</td><td></td></tr>`).join('')}`).join('')}
+            </tbody>
+          </table></div>` : '<p class="amb-empty">Aucune commission sur cette période.</p>'}`;
+
+        $('#recap-period', pane).addEventListener('change', (e) => { period = e.target.value || monthKey(); draw(); });
+        $('#recap-csv', pane).addEventListener('click', () => exportCsv(rows, period));
+        $$('[data-paid]', pane).forEach((b) => b.addEventListener('click', async () => {
+          const g = groups.find((x) => x.uid === b.dataset.paid);
+          if (!confirm(`Marquer ${fcfa(g.payable)} comme versés à ${g.name} pour ${periodLabel(period)} ?`)) return;
+          busy(b, true, 'Enregistrement…');
+          try {
+            await adminCall('markPaid', { ambassadorUid: g.uid, period, note: `Récapitulatif ${periodLabel(period)}` });
+            await renderRecap(pane);
+          } catch (ex) { alert(errText(ex)); busy(b, false); }
+        }));
+      };
+      draw();
+    } catch (ex) { pane.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
+  }
+
+  function exportCsv(rows, period) {
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Ambassadeur', 'Code', 'Restaurant', 'Mois', 'Type', 'Taux (%)', 'Montant (FCFA)', 'Statut', 'Période', 'Payable le'].map(cell).join(';')];
+    for (const c of rows) {
+      const p = people.find((x) => x.id === c.uid);
+      lines.push([p?.nom || c.uid, p?.code || '', c.restaurantNom || c.restaurantId, c.moisIndex, c.type, c.taux, c.montant, COMMISSION_LABEL[commissionState(c)], c.period, dateFr(c.payableAt)].map(cell).join(';'));
+    }
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `recap-ambassadeurs-${period}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* ── Réglages ── */
+  function renderSettings(pane) {
+    const fields = [
+      ['firstPct', 'Commission du 1er mois (%)', 0, 100],
+      ['recurringPct', 'Commission des mois suivants (%)', 0, 100],
+      ['offeredMonth', 'Mois offert au client (n°)', 1, 12],
+      ['maxMonths', 'Durée des commissions (mois)', 1, 36],
+      ['validationDays', 'Délai de validation (jours)', 0, 60],
+      ['closingDay', 'Jour de clôture du mois', 1, 28],
+      ['paymentDay', 'Jour de versement', 1, 28]
+    ];
+    pane.innerHTML = `
+      <form class="pg-form amb-settings" id="settings-form" novalidate>
+        ${fields.map(([k, l, min, max]) => `<div class="form-group"><label for="set-${k}">${l}</label><input id="set-${k}" name="${k}" type="number" min="${min}" max="${max}" step="1" class="form-control" value="${esc(settings[k])}" required></div>`).join('')}
+        <div class="form-group span-2"><label for="set-url">URL de la page Epicure (cible des liens)</label><input id="set-url" name="epicureUrl" type="url" class="form-control" value="${esc(settings.epicureUrl)}" required></div>
+        <p class="amb-hint span-2">Ces réglages s'appliquent aux prochains événements envoyés par Epicure. Les commissions déjà créées ne changent pas.</p>
+        <p class="form-error span-2" id="settings-error" role="alert" hidden></p>
+        <button class="btn btn--primary" type="submit">Enregistrer les réglages</button>
       </form>`;
-
-    const today = new Date().toISOString().slice(0, 10);
-    $$('input[type=date]', box).forEach((i) => { i.value = today; });
-    const base = (sub, cid) => doc(db, 'ambassadors', p.id, sub, cid);
-
-    $$('[data-c]', box).forEach((b) => b.addEventListener('click', async () => {
-      try {
-        if (b.dataset.c === 'pay') await updateDoc(base('clients', b.dataset.cid), { moisPayes: increment(1) });
-        if (b.dataset.c === 'cancel') await updateDoc(base('clients', b.dataset.cid), { statut: 'resilie' });
-        if (b.dataset.c === 'reactivate') await updateDoc(base('clients', b.dataset.cid), { statut: 'actif' });
-        if (b.dataset.c === 'delpay') { if (!confirm('Supprimer ce versement ?')) return; await deleteDoc(base('payouts', b.dataset.pid)); }
-        box.hidden = true; manage(p);
-      } catch (ex) { alert(errText(ex)); }
-    }));
-
-    $('[data-form=client]', box).addEventListener('submit', async (e) => {
+    $('#settings-form', pane).addEventListener('submit', async (e) => {
       e.preventDefault();
-      const f = e.target;
+      const f = e.target, btn = f.querySelector('button[type=submit]'), err = $('#settings-error', pane);
+      const data = {};
+      for (const [k] of fields) {
+        const n = Number(f[k].value);
+        if (!Number.isFinite(n)) return show(err, 'Vérifiez les valeurs saisies.');
+        data[k] = n;
+      }
+      data.epicureUrl = f.epicureUrl.value.trim();
+      show(err, ''); busy(btn, true, 'Enregistrement…');
       try {
-        await addDoc(collection(db, 'ambassadors', p.id, 'clients'), {
-          client: f.client.value.trim(), produit: 'Epicure', formule: f.formule.value, prix: PLANS[f.formule.value],
-          moisPayes: 1, statut: 'actif', dateSignature: Timestamp.fromDate(new Date(f.date.value))
-        });
-        box.hidden = true; manage(p);
-      } catch (ex) { alert(errText(ex)); }
-    });
-
-    $('[data-form=payout]', box).addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const f = e.target;
-      try {
-        await addDoc(collection(db, 'ambassadors', p.id, 'payouts'), {
-          montant: Number(f.montant.value), note: f.note.value.trim(), date: Timestamp.fromDate(new Date(f.date.value))
-        });
-        box.hidden = true; manage(p);
-      } catch (ex) { alert(errText(ex)); }
+        await setDoc(doc(db, 'settings', 'platform'), data);
+        settings = { ...DEFAULT_SETTINGS, ...data };
+        btn.textContent = 'Enregistré';
+        setTimeout(() => busy(btn, false), 1600);
+      } catch (ex) { show(err, errText(ex)); busy(btn, false); }
     });
   }
 }

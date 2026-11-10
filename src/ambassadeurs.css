@@ -249,3 +249,44 @@
 @media (prefers-reduced-motion: reduce) {
   .amb-hero::before, .amb-hero::after, .amb-feed__dot, .amb-feed__list li { animation: none !important; }
 }
+
+/* ───────── Lien personnel + QR code (espace ambassadeur) ───────── */
+.amb-share { align-items: flex-start; }
+.amb-share > div:first-child { min-width: 0; flex: 1; }
+.amb-link-url { display: block; margin-top: 2px; padding: 7px 10px; border-radius: 9px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; color: rgba(232, 245, 236, .9); background: rgba(255, 255, 255, .08); border: 0.5px solid rgba(255, 255, 255, .16); overflow-wrap: anywhere; }
+.amb-share__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.amb-share .btn--ghost { color: #e8f5ec; border-color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .06); }
+.amb-share .btn--ghost:hover { background: rgba(255, 255, 255, .16); }
+
+.amb-qr { width: min(340px, calc(100vw - 40px)); padding: 24px; border-radius: 20px; text-align: center; color: var(--text-primary); background: var(--surface-2); border: 0.5px solid var(--border); box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .5); }
+.amb-qr::backdrop { background: rgba(8, 20, 13, .6); backdrop-filter: blur(3px); }
+.amb-qr img { display: block; width: 240px; height: 240px; margin: 0 auto; border-radius: 12px; background: #fff; }
+.amb-qr p { margin: 12px 0 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.amb-qr small { display: block; font-size: 12px; color: var(--text-tertiary); }
+.amb-qr__close { margin-top: 16px; }
+
+/* ───────── Administration : onglets principaux, suivi, récap, réglages ───────── */
+.amb-main-tabs { max-width: 720px; }
+.amb-copy { padding: 6px 10px; border-radius: 8px; border: 0.5px solid var(--border); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-primary); background: var(--bg); cursor: pointer; white-space: nowrap; }
+.amb-copy:hover { background: var(--surface); }
+.amb-copy:disabled { opacity: .5; cursor: default; }
+
+.amb-rest { align-items: flex-start; }
+.amb-rest > span:first-child { flex: 1; min-width: 0; }
+.amb-rest__detail { flex-basis: 100%; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 0.5px dashed var(--border); }
+.amb-rest__detail p { margin: 6px 0 4px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.amb-rest__detail p:first-child { margin-top: 0; }
+.amb-rest__detail ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.amb-rest__detail li { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.amb-flag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #7a5200; background: rgba(244, 192, 86, .25); border: 0.5px solid rgba(233, 163, 25, .5); }
+[data-theme="dark"] .amb-flag { color: var(--accent-light); }
+
+.amb-recap__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.amb-recap__filters label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.amb-recap__filters input { width: auto; max-width: 190px; }
+.amb-recap__head > * { background: var(--surface); }
+.amb-recap__head th span { margin-left: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-tertiary); }
+.amb-recap__head td b { color: var(--pine); }
+[data-theme="dark"] .amb-recap__head td b { color: var(--pine-bright); }
+
+.amb-settings { max-width: 720px; padding: clamp(18px, 3vw, 28px); border-radius: 20px; background: var(--surface-2); border: 0.5px solid var(--border); }

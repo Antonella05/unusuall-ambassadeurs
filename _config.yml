@@ -2,5 +2,7 @@
 exclude:
   - src
   - scripts
+  - worker
   - README.md
   - firestore.rules
+  - firebase.json

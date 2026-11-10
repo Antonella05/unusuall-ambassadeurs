@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '5';
+const V = '7';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -215,7 +215,7 @@ PAGES.push({
             <div class="ep-head" data-ep-reveal><h2>Simple comme 1, 2, 3</h2></div>
             <ol class="ep-steps amb-steps3" data-ep-stagger>
               <li><strong>Inscrivez-vous</strong><span>En deux minutes, gratuitement.</span></li>
-              <li><strong>Partagez</strong><span>Parlez de nos produits avec votre code.</span></li>
+              <li><strong>Partagez</strong><span>Votre lien personnel ou votre QR code.</span></li>
               <li><strong>Encaissez</strong><span>Chaque mois, sur Mobile Money.</span></li>
             </ol>
           </div>
@@ -369,7 +369,7 @@ const FAQ = [
   ['Faut-il de l\x27expérience ?', 'Non. L\x27envie de convaincre suffit, on vous forme.'],
   ['Dois-je payer quelque chose ?', 'Non. Tout est gratuit : compte, formation et kit.'],
   ['Comment suis-je payé ?', 'Chaque mois, par Mobile Money. Tout est visible dans votre espace.'],
-  ['Comment savez-vous que le client vient de moi ?', 'Grâce à votre code ambassadeur, que le client donne à son inscription.'],
+  ['Comment savez-vous que le client vient de moi ?', 'Grâce à votre lien personnel et à votre QR code : chaque clic, inscription et paiement est compté automatiquement.'],
   ['Puis-je représenter plusieurs produits ?', 'Oui. Epicure est ouvert, les autres arrivent bientôt.'],
   ['Est-ce un emploi salarié ?', 'Non, vous êtes indépendant. Mais les meilleurs sont recrutés en priorité.']
 ];
@@ -399,7 +399,7 @@ PAGES.push({
             <ol class="ep-steps" data-ep-stagger>
               <li><strong>Créez votre compte</strong><span>Avec votre e-mail et un mot de passe.</span></li>
               <li><strong>Postulez</strong><span>En deux minutes.</span></li>
-              <li><strong>Suivez vos gains</strong><span>Code, clients et paiements dans votre espace.</span></li>
+              <li><strong>Suivez vos gains</strong><span>Lien, restaurants et paiements dans votre espace.</span></li>
             </ol>
           </div>
 
@@ -467,7 +467,7 @@ PAGES.push({
 PAGES.push({
   file: 'espace.html',
   title: 'Mon espace · Ambassadeurs UNUSUALL',
-  desc: 'Votre espace ambassadeur UNUSUALL : candidature, code, clients, gains et versements.',
+  desc: 'Votre espace ambassadeur UNUSUALL : candidature, lien personnel, QR code, restaurants, gains et versements.',
   windowTitle: 'Mon espace',
   account: 'space',
   noindex: true,
