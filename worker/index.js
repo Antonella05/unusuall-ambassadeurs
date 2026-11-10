@@ -576,6 +576,10 @@ async function admin(request, env, fs) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin') || '';
+    const cors = url.pathname === '/admin' && ALLOWED_ORIGINS.includes(origin)
+      ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' }
+      : {};
     try {
       const fs = new Firestore(env);
       if (url.pathname === '/go') return await go(url, fs);
@@ -586,7 +590,7 @@ export default {
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });
       return json({ error: 'not_found' }, 404);
     } catch (err) {
-      return json({ error: err.message || 'internal', code: err.code || 'internal' }, err.status || 500);
+      return json({ error: err.message || 'internal', code: err.code || 'internal' }, err.status || 500, cors);
     }
   }
 };
