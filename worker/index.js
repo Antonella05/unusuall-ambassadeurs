@@ -1,6 +1,7 @@
 /* UNUSUALL Ambassadeurs — Worker Cloudflare (plan gratuit, sans Blaze).
    Routes : /go (redirection + clic), /qr (SVG), /search (recherche publique),
-            /webhook (événements Epicure, secret), /admin (actions admin, jeton Firebase).
+            /directory (annuaire public), /webhook (événements Epicure, secret),
+            /admin (actions admin, jeton Firebase).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
@@ -221,6 +222,40 @@ async function search(url, fs) {
     .filter((a) => a.code && norm(a.nom).includes(q))
     .slice(0, 10)
     .map((a) => ({ name: a.nom, code: a.code }));
+  return json(out, 200, headers);
+}
+
+/* ───────── /directory : annuaire public (nom, code ou téléphone) ───────── */
+const fold = (v) => String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+async function directory(url, fs) {
+  const raw = str(url.searchParams.get('q'));
+  const headers = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=120' };
+  const q = fold(raw);
+  const qd = digits(raw);
+  if (q.length < 2 && qd.length < 3) return json([], 200, headers);
+  const statuses = ['approved', 'suspended', 'removed'];
+  const statusOf = { approved: 'actif', suspended: 'suspendu', removed: 'retire' };
+  const docs = (await Promise.all(statuses.map((s) => fs.query('ambassadors', { where: eq('status', s), limit: 300 })))).flat();
+  const out = docs
+    .map((d) => decFields(d.fields || {}))
+    .filter((a) => a.code && a.annuaire !== false)
+    .filter((a) => {
+      if (q.length >= 2 && (fold(a.nom).includes(q) || fold(a.code).includes(q))) return true;
+      if (qd.length >= 3 && digits(a.whatsapp).includes(qd)) return true;
+      return false;
+    })
+    .slice(0, 20)
+    .map((a) => ({
+      nom: a.nom || '',
+      code: a.code,
+      ville: a.ville || '',
+      quartier: a.quartier || '',
+      produits: (a.produits || []).concat((a.produitsFuturs || []).map((p) => p + ' (à venir)')),
+      entryAt: a.approvedAt || a.createdAt || null,
+      status: statusOf[a.status] || 'actif',
+      photo: a.photo || ''
+    }))
+    .sort((x, y) => String(x.nom).localeCompare(String(y.nom), 'fr'));
   return json(out, 200, headers);
 }
 
@@ -599,6 +634,7 @@ export default {
       if (url.pathname === '/go') return await go(url, fs, request);
       if (url.pathname === '/qr') return qr(url);
       if (url.pathname === '/search') return await search(url, fs);
+      if (url.pathname === '/directory') return await directory(url, fs);
       if (url.pathname === '/webhook') return await webhook(request, env, fs);
       if (url.pathname === '/admin') return await admin(request, env, fs);
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });

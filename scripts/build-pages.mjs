@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '8';
+const V = '9';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -15,6 +15,7 @@ const ICON = {
   gains: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 16h16"/><path d="M8 16V8"/><path d="M12 16V11"/><path d="M16 16V6"/></svg>',
   perks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6 .9-4.35 4.25 1 6L12 16.8l-5.4 2.85 1-6L3.3 9.4l6-.9z"/></svg>',
   user: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   apply: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14l2 2 4-4"/></svg>'
 };
 
@@ -23,6 +24,7 @@ const NAV = [
   { href: 'produits.html', label: 'Produits', icon: 'products', cls: 'olivia' },
   { href: 'gains.html', label: 'Gains', icon: 'gains', cls: 'omi' },
   { href: 'avantages.html', label: 'Avantages', icon: 'perks', cls: 'perks' },
+  { href: 'annuaire.html', label: 'Annuaire', icon: 'search', cls: 'annuaire' },
   { href: 'postuler.html', label: 'Postuler', icon: 'apply', cls: 'contact' },
   { href: 'espace.html', label: 'Mon espace', icon: 'user', cls: 'sofia' }
 ];
@@ -40,7 +42,7 @@ const SOCIAL = `
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
-function page({ file, title, desc, windowTitle, back, body, jsonld, account, noindex }) {
+function page({ file, title, desc, windowTitle, back, body, jsonld, account, script, noindex }) {
   const url = file === 'index.html' ? `${ORIGIN}/` : `${ORIGIN}/${file}`;
   const dock = NAV.map((n) => `      <a href="${n.href}" class="app-dock__item" data-page="${n.href}"><span class="app-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="app-dock__label">${n.label}</span></a>`).join('\n');
   const mdock = NAV.map((n) => `    <a href="${n.href}" class="mobile-dock__item" data-page="${n.href}"><span class="mobile-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="mobile-dock__label">${n.label}</span></a>`).join('\n');
@@ -82,7 +84,8 @@ function page({ file, title, desc, windowTitle, back, body, jsonld, account, noi
   <link rel="stylesheet" href="assets/css/app.css?v=${V}">
   <script src="assets/js/app.js?v=${V}" defer></script>${account ? `
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <script type="module" src="assets/js/account.js?v=${V}"></script>` : ''}
+  <script type="module" src="assets/js/account.js?v=${V}"></script>` : ''}${script ? `
+  <script type="module" src="assets/js/${script}?v=${V}"></script>` : ''}
   <script type="application/ld+json">
   ${ld}
   </script>
@@ -135,6 +138,7 @@ ${body}
             <a href="produits.html">Produits</a>
             <a href="gains.html">Gains</a>
             <a href="avantages.html">Avantages</a>
+            <a href="annuaire.html">Annuaire</a>
             <a href="postuler.html">Postuler</a>
           </div>
           <div class="app-footer__col">
@@ -480,24 +484,36 @@ PAGES.push({
           <div id="space" aria-live="polite"><p class="amb-empty">Chargement de votre espace…</p></div>
 
           <form class="pg-form amb-apply-form" id="apply-form" novalidate hidden>
-            <div class="pg-card__head span-2"><h2>Votre candidature</h2><p>Les champs marqués d'un * sont obligatoires.</p></div>
+            <div class="pg-card__head span-2"><h2>Votre candidature</h2><p>Les champs marqués d'un * sont obligatoires. Une candidature complète et sérieuse est traitée en priorité.</p></div>
             <div class="form-group"><label for="f-name">Nom et prénom *</label><input id="f-name" name="nom" type="text" class="form-control" autocomplete="name" required maxlength="100"></div>
             <div class="form-group"><label for="f-email">E-mail</label><input id="f-email" name="email" type="email" class="form-control" readonly></div>
-            <div class="form-group"><label for="f-phone">Numéro WhatsApp *</label><input id="f-phone" name="whatsapp" type="tel" class="form-control" autocomplete="tel" placeholder="+229 …" required maxlength="30"></div>
+
+            <div class="form-group"><label for="f-phone">Téléphone WhatsApp *</label><input id="f-phone" name="whatsapp" type="tel" class="form-control" autocomplete="tel" inputmode="tel" placeholder="+229 …" required maxlength="30"></div>
             <div class="form-group"><label for="f-city">Ville *</label><input id="f-city" name="ville" type="text" class="form-control" autocomplete="address-level2" required maxlength="80"></div>
+            <div class="form-group"><label for="f-district">Quartier *</label><input id="f-district" name="quartier" type="text" class="form-control" autocomplete="address-level3" required maxlength="80" placeholder="Ex. : Fidjrossè, Akpakpa…"></div>
+            <div class="form-group"><label for="f-job">Profession actuelle *</label><input id="f-job" name="profession" type="text" class="form-control" required maxlength="100" placeholder="Ex. : étudiant, commercial, gérant…"></div>
+
+            <fieldset class="form-group span-2 amb-choose" data-require-group="reseau">
+              <legend>Votre réseau * <small>(au moins un)</small></legend>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Restaurateurs que je connais"><span><b>Restaurateurs</b><small>Je connais des gérants de restaurants, maquis, bars…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Communauté (église, quartier, association)"><span><b>Communauté</b><small>Église, quartier, association, école…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Réseaux sociaux"><span><b>Réseaux sociaux</b><small>Facebook, Instagram, TikTok, WhatsApp…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Autre"><span><b>Autre</b><small>Un autre réseau utile pour convaincre.</small></span></label>
+            </fieldset>
+
+            <div class="form-group span-2"><label for="f-profile-link">Lien vers un profil (Facebook, Instagram, LinkedIn…) *</label><input id="f-profile-link" name="profilLien" type="url" class="form-control" required maxlength="300" placeholder="https://…"><p class="amb-hint">Pour vérifier que votre profil existe. Il ne sera pas publié.</p></div>
+            <div class="form-group span-2"><label for="f-photo">Lien vers une photo de profil (facultatif)</label><input id="f-photo" name="photo" type="url" class="form-control" maxlength="300" placeholder="https://…"><p class="amb-hint">Ajoutée à votre fiche dans l'annuaire public.</p></div>
+
             <fieldset class="form-group span-2 amb-choose">
               <legend>Les produits que vous voulez représenter *</legend>
               <label class="amb-choice"><input type="checkbox" name="produits" value="Epicure" checked required><span><b>Epicure</b><small>Gestion de restaurant · ouvert</small></span></label>
               <label class="amb-choice is-soon"><input type="checkbox" name="produits_futurs" value="Suite SOFIA"><span><b>Suite SOFIA</b><small>Santé · me prévenir à l'ouverture</small></span></label>
               <label class="amb-choice is-soon"><input type="checkbox" name="produits_futurs" value="OMI"><span><b>OMI</b><small>Données mobiles · me prévenir à l'ouverture</small></span></label>
             </fieldset>
-            <div class="form-group span-2"><label for="f-profile">Vous êtes plutôt… *</label>
-              <select id="f-profile" name="profil" class="form-control" required>
-                <option value="">Choisissez</option><option>Étudiant(e)</option><option>Commercial(e) ou vendeur(se)</option><option>Dans la restauration</option><option>Créateur(trice) de contenu</option><option>Autre</option>
-              </select>
-            </div>
-            <div class="form-group span-2"><label for="f-how">Comment comptez-vous faire connaître nos produits ? *</label><textarea id="f-how" name="methode" class="form-control" rows="4" required maxlength="2000" placeholder="Ex. : je connais beaucoup de restaurants à Calavi, je ferai des visites et je partagerai sur mes réseaux…"></textarea></div>
-            <div class="form-group span-2"><label for="f-social">Vos réseaux sociaux (facultatif)</label><input id="f-social" name="reseaux" type="text" class="form-control" maxlength="300" placeholder="Lien Facebook, Instagram, TikTok, LinkedIn…"></div>
+
+            <div class="form-group span-2"><label for="f-motivation">Comment comptes-tu présenter Epicure à un restaurateur ? *</label><textarea id="f-motivation" name="motivation" class="form-control" rows="5" required minlength="80" maxlength="2000" placeholder="Décrivez concrètement votre approche : ce que vous direz au gérant, comment vous gérerez ses objections, comment vous le ferez essayer…"></textarea><p class="amb-hint">Une réponse détaillée (80 caractères minimum) montre que vous avez lu la formation.</p></div>
+
+            <label class="amb-agree span-2"><input type="checkbox" name="annuaire" value="1" checked> J'accepte d'apparaître dans l'<a href="annuaire.html">annuaire public</a> des ambassadeurs certifiés (nom, ville, produits, photo).</label>
             <label class="amb-agree span-2"><input type="checkbox" name="charte" value="acceptee" required> J'accepte la <a href="avantages.html">charte de l'ambassadeur</a> et le traitement de mes données pour étudier ma candidature. *</label>
             <p class="form-error" id="apply-error" role="alert" hidden></p>
             <button class="btn btn--primary" type="submit">Envoyer ma candidature →</button>
@@ -518,6 +534,39 @@ PAGES.push({
             <button type="button" class="btn btn--ghost" id="logout">Se déconnecter</button>
           </div>
           <div id="admin" aria-live="polite"><p class="amb-empty">Chargement…</p></div>`
+});
+
+/* 9. Annuaire public des ambassadeurs (vérification) */
+PAGES.push({
+  file: 'annuaire.html',
+  title: 'Annuaire des ambassadeurs · UNUSUALL',
+  desc: "Vérifiez qu'une personne est bien un Ambassadeur certifié UNUSUALL. Recherche par nom, code ambassadeur ou numéro de téléphone.",
+  windowTitle: 'Annuaire',
+  back: { href: 'index.html', label: 'Programme' },
+  script: 'annuaire.js',
+  body: `
+          <div class="ep-head amb-top" data-ep-reveal>
+            <p class="pg-eyebrow">Annuaire public</p>
+            <h1 class="pg-title">Vérifiez un <span class="flame-text">Ambassadeur UNUSUALL</span></h1>
+            <p>Recherchez par nom, code ambassadeur ou numéro de téléphone.</p>
+          </div>
+
+          <form class="ann-search" id="ann-search" role="search" novalidate>
+            <div class="ann-search__field">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input id="ann-q" type="search" name="q" autocomplete="off" spellcheck="false" placeholder="Nom, code (ex. U7XK2M) ou téléphone" aria-label="Nom, code ambassadeur ou numéro de téléphone">
+            </div>
+            <button class="btn btn--primary" type="submit">Rechercher</button>
+          </form>
+
+          <div id="ann-results" class="ann-results" aria-live="polite">
+            <div class="ann-idle">
+              <span class="ann-idle__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+              <p>Entrez un nom, un code ou un numéro pour vérifier si la personne est un ambassadeur certifié.</p>
+            </div>
+          </div>
+
+          <p class="ann-help">Un doute sur une personne ? <a href="mailto:services@unusuall.online?subject=Signalement%20ambassadeur%20UNUSUALL">Signalez-la à services@unusuall.online</a>.</p>`
 });
 
 for (const p of PAGES) {

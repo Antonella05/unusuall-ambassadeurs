@@ -77,6 +77,7 @@ function busy(btn, on, label) {
   else { btn.disabled = false; btn.textContent = btn.dataset.label || btn.textContent; }
 }
 function show(el, msg) { if (!el) return; el.textContent = msg; el.hidden = !msg; }
+const isHttpUrl = (v) => { try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } };
 async function copyBtn(btn, text, okLabel) {
   const label = btn.textContent;
   try { await navigator.clipboard.writeText(text); btn.textContent = okLabel; }
@@ -197,7 +198,8 @@ if (PAGE === 'space') {
         <dl class="amb-summary">
           <div><dt>Envoyée le</dt><dd>${esc(dateFr(a.createdAt))}</dd></div>
           <div><dt>Produits</dt><dd>${esc((a.produits || []).join(', '))}</dd></div>
-          <div><dt>Ville</dt><dd>${esc(a.ville)}</dd></div>
+          <div><dt>Ville · quartier</dt><dd>${esc(a.ville)}${a.quartier ? ' · ' + esc(a.quartier) : ''}</dd></div>
+          <div><dt>Profession</dt><dd>${esc(a.profession || a.profil || '—')}</dd></div>
           <div><dt>WhatsApp</dt><dd>${esc(a.whatsapp)}</dd></div>
         </dl>
       </div>`;
@@ -211,13 +213,31 @@ if (PAGE === 'space') {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = $('#apply-error');
-      const bad = $$('[required]', form).filter((f) => {
-        const ko = f.type === 'checkbox' ? !f.checked : !f.value.trim();
-        f.setAttribute('aria-invalid', String(ko));
-        return ko;
-      });
-      if (bad.length) { show(err, 'Merci de remplir tous les champs obligatoires.'); return bad[0].focus(); }
       show(err, '');
+      const invalid = [];
+      const mark = (el, ko) => { if (!el) return; el.setAttribute('aria-invalid', String(ko)); if (ko) invalid.push(el); };
+
+      $$('[required]', form).forEach((f) => mark(f, f.type === 'checkbox' ? !f.checked : !f.value.trim()));
+
+      const reseauBoxes = $$('input[name=reseau]', form);
+      const noReseau = !reseauBoxes.some((b) => b.checked);
+      if (noReseau) invalid.push(reseauBoxes[0]);
+
+      const motivation = form.motivation.value.trim();
+      if (motivation.length < 80) mark(form.motivation, true);
+
+      const profilLien = form.profilLien.value.trim();
+      if (!isHttpUrl(profilLien)) mark(form.profilLien, true);
+      const photo = form.photo.value.trim();
+      if (photo && !isHttpUrl(photo)) mark(form.photo, true);
+
+      if (invalid.length) {
+        show(err, noReseau ? 'Indiquez au moins un type de réseau.'
+          : motivation.length > 0 && motivation.length < 80 ? 'Détaillez votre motivation (80 caractères minimum).'
+          : 'Vérifiez les liens de profil et de photo, puis complétez les champs obligatoires.');
+        return invalid[0].focus();
+      }
+
       const btn = form.querySelector('button[type=submit]');
       busy(btn, true, 'Envoi en cours…');
       const data = {
@@ -225,11 +245,15 @@ if (PAGE === 'space') {
         whatsapp: form.whatsapp.value.trim().slice(0, 30),
         email: user.email,
         ville: form.ville.value.trim().slice(0, 80),
-        profil: form.profil.value.slice(0, 60),
-        methode: form.methode.value.trim().slice(0, 2000),
-        reseaux: form.reseaux.value.trim().slice(0, 300),
+        quartier: form.quartier.value.trim().slice(0, 80),
+        profession: form.profession.value.trim().slice(0, 100),
+        reseau: $$('input[name=reseau]:checked', form).map((i) => i.value),
+        profilLien: profilLien.slice(0, 300),
+        photo: photo.slice(0, 300),
+        motivation: motivation.slice(0, 2000),
         produits: $$('input[name=produits]:checked', form).map((i) => i.value),
         produitsFuturs: $$('input[name=produits_futurs]:checked', form).map((i) => i.value),
+        annuaire: form.annuaire.checked,
         charte: true,
         status: 'pending',
         code: null,
@@ -241,7 +265,8 @@ if (PAGE === 'space') {
         // Alerte e-mail pour l'équipe (non bloquante)
         const mail = new FormData();
         mail.append('_subject', '[Ambassadeur UNUSUALL] Nouvelle candidature');
-        ['nom', 'whatsapp', 'email', 'ville', 'profil', 'methode', 'reseaux'].forEach((k) => mail.append(k, data[k]));
+        ['nom', 'whatsapp', 'email', 'ville', 'quartier', 'profession', 'profilLien', 'photo', 'motivation'].forEach((k) => mail.append(k, data[k]));
+        mail.append('reseau', data.reseau.join(', '));
         mail.append('produits', data.produits.concat(data.produitsFuturs.map((p) => p + ' (à l\'ouverture)')).join(', '));
         fetch(FORMSPREE, { method: 'POST', body: mail, headers: { Accept: 'application/json' } }).catch(() => {});
         form.hidden = true;
@@ -392,9 +417,14 @@ if (PAGE === 'admin') {
   }
 
   /* ── Candidatures ── */
+  const BUCKETS = { pending: ['pending'], approved: ['approved', 'suspended', 'removed'], rejected: ['rejected'] };
+  const STATE_LABEL = { pending: 'En attente', approved: 'Actif', suspended: 'Suspendu', removed: 'Retiré', rejected: 'Refusé' };
+  const STATE_CLS = { pending: 'amb-state--pending', approved: 'amb-state--approved', suspended: 'amb-state--suspended', removed: 'amb-state--removed', rejected: 'amb-state--rejected' };
+
   function renderCandidates(pane, filter) {
-    const count = (s) => people.filter((p) => p.status === s).length;
-    const list = people.filter((p) => p.status === filter);
+    const inBucket = (p, k) => BUCKETS[k].includes(p.status);
+    const count = (k) => people.filter((p) => inBucket(p, k)).length;
+    const list = people.filter((p) => inBucket(p, filter));
     pane.innerHTML = `
       <div class="amb-tabs amb-tabs--admin" role="tablist">
         ${[['pending', 'En attente'], ['approved', 'Validés'], ['rejected', 'Refusés']].map(([k, l]) => `<button type="button" role="tab" data-filter="${k}" aria-selected="${k === filter}">${l} <span>${count(k)}</span></button>`).join('')}
@@ -405,21 +435,31 @@ if (PAGE === 'admin') {
   }
 
   function card(p) {
+    const manage = ['approved', 'suspended', 'removed'].includes(p.status);
     return `<li class="amb-person">
       <div class="amb-person__head">
-        <div><strong>${esc(p.nom)}</strong><span>${esc(p.ville)} · ${esc(p.profil)} · envoyée le ${esc(dateFr(p.createdAt))}</span></div>
+        <div><strong>${esc(p.nom)}</strong><span>${esc(p.ville)}${p.quartier ? ' · ' + esc(p.quartier) : ''} · ${esc(p.profession || p.profil || '—')} · envoyée le ${esc(dateFr(p.createdAt))}</span></div>
         ${p.code ? `<code>${esc(p.code)}</code>` : ''}
+        <em class="amb-state ${STATE_CLS[p.status] || ''}">${esc(STATE_LABEL[p.status] || p.status)}</em>
       </div>
       <dl class="amb-summary">
         <div><dt>WhatsApp</dt><dd>${esc(p.whatsapp)}</dd></div>
         <div><dt>E-mail</dt><dd>${esc(p.email)}</dd></div>
+        <div><dt>Ville · quartier</dt><dd>${esc(p.ville)}${p.quartier ? ' · ' + esc(p.quartier) : ''}</dd></div>
+        <div><dt>Profession</dt><dd>${esc(p.profession || p.profil || '—')}</dd></div>
+        <div><dt>Réseau</dt><dd>${esc((p.reseau || []).join(', ') || p.reseaux || '—')}</dd></div>
+        <div><dt>Profil</dt><dd>${p.profilLien ? `<a href="${esc(p.profilLien)}" target="_blank" rel="noopener">Voir le profil ↗</a>` : '—'}</dd></div>
         <div><dt>Produits</dt><dd>${esc((p.produits || []).join(', '))}${p.produitsFuturs?.length ? ' · plus tard : ' + esc(p.produitsFuturs.join(', ')) : ''}</dd></div>
-        <div><dt>Réseaux</dt><dd>${esc(p.reseaux || '—')}</dd></div>
-        <div class="is-wide"><dt>Sa méthode</dt><dd>${esc(p.methode)}</dd></div>
+        <div><dt>Annuaire public</dt><dd>${p.annuaire === false ? 'Refusé' : 'Accepté'}</dd></div>
+        <div class="is-wide"><dt>Motivation</dt><dd>${esc(p.motivation || p.methode || '—')}</dd></div>
       </dl>
       <div class="pg-cta">
-        ${p.status !== 'approved' ? `<button type="button" class="btn btn--primary" data-act="approve" data-id="${esc(p.id)}">Valider et créer son lien</button>` : `<button type="button" class="btn btn--primary" data-act="manage" data-id="${esc(p.id)}">Restaurants et gains</button>`}
-        ${p.status !== 'rejected' ? `<button type="button" class="btn btn--ghost" data-act="reject" data-id="${esc(p.id)}">Refuser</button>` : ''}
+        ${p.status === 'pending' ? `<button type="button" class="btn btn--primary" data-act="approve" data-id="${esc(p.id)}">Valider et créer son lien</button>` : ''}
+        ${manage ? `<button type="button" class="btn btn--primary" data-act="manage" data-id="${esc(p.id)}">Restaurants et gains</button>` : ''}
+        ${p.status === 'approved' ? `<button type="button" class="btn btn--ghost" data-act="suspend" data-id="${esc(p.id)}">Suspendre</button>` : ''}
+        ${(p.status === 'suspended' || p.status === 'removed') ? `<button type="button" class="btn btn--primary" data-act="reactivate" data-id="${esc(p.id)}">Réactiver</button>` : ''}
+        ${(p.status === 'approved' || p.status === 'suspended') ? `<button type="button" class="btn btn--ghost" data-act="remove" data-id="${esc(p.id)}">Retirer</button>` : ''}
+        ${p.status === 'pending' ? `<button type="button" class="btn btn--ghost" data-act="reject" data-id="${esc(p.id)}">Refuser</button>` : ''}
       </div>
       <div class="amb-manage" id="m-${esc(p.id)}" hidden></div>
     </li>`;
@@ -440,13 +480,27 @@ if (PAGE === 'admin') {
     try {
       if (what === 'approve') {
         const code = p.code || uniqueCode();
-        await updateDoc(doc(db, 'ambassadors', id), { status: 'approved', code, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'ambassadors', id), { status: 'approved', code, approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
         Object.assign(p, { status: 'approved', code });
         renderCandidates(pane, filter);
       } else if (what === 'reject') {
         if (!confirm(`Refuser la candidature de ${p.nom} ?`)) return;
         await updateDoc(doc(db, 'ambassadors', id), { status: 'rejected', updatedAt: serverTimestamp() });
         p.status = 'rejected';
+        renderCandidates(pane, filter);
+      } else if (what === 'suspend') {
+        if (!confirm(`Suspendre ${p.nom} ? Son lien cesse de compter et sa fiche sera signalée comme suspendue dans l'annuaire.`)) return;
+        await updateDoc(doc(db, 'ambassadors', id), { status: 'suspended', updatedAt: serverTimestamp() });
+        p.status = 'suspended';
+        renderCandidates(pane, filter);
+      } else if (what === 'remove') {
+        if (!confirm(`Retirer ${p.nom} du programme ? Son lien cessera de fonctionner.`)) return;
+        await updateDoc(doc(db, 'ambassadors', id), { status: 'removed', updatedAt: serverTimestamp() });
+        p.status = 'removed';
+        renderCandidates(pane, filter);
+      } else if (what === 'reactivate') {
+        await updateDoc(doc(db, 'ambassadors', id), { status: 'approved', updatedAt: serverTimestamp() });
+        p.status = 'approved';
         renderCandidates(pane, filter);
       } else if (what === 'manage') {
         const box = $(`#m-${CSS.escape(p.id)}`);

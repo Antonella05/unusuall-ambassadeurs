@@ -4,8 +4,11 @@
 
 /* Icônes du dock : svg en ligne (le site les injecte par script) */
 .app-dock__icon svg, .mobile-dock__icon svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.app-dock__icon--perks { background: linear-gradient(135deg, var(--accent) 0%, #c4841a 100%); }
-.app-dock__icon--perks svg { stroke: var(--pine-900); }
+/* Seul « Mon espace » est orange ; les autres onglets du menu restent verts. */
+.app-dock__icon--perks { background: linear-gradient(135deg, var(--pine) 0%, var(--pine-light) 100%); }
+.app-dock__icon--annuaire { background: linear-gradient(135deg, var(--pine) 0%, var(--pine-light) 100%); }
+.app-dock__icon--sofia { background: linear-gradient(135deg, var(--accent) 0%, #c4841a 100%); }
+.app-dock__icon--sofia svg { stroke: var(--pine-900); }
 
 /* Haut de page */
 .amb-hero__mark { width: 72px; height: 72px; animation: ambBob 5s ease-in-out infinite; }
@@ -290,3 +293,64 @@
 [data-theme="dark"] .amb-recap__head td b { color: var(--pine-bright); }
 
 .amb-settings { max-width: 720px; padding: clamp(18px, 3vw, 28px); border-radius: 20px; background: var(--surface-2); border: 0.5px solid var(--border); }
+
+/* Statuts (admin) */
+.amb-state { font-style: normal; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 3px 10px; border-radius: 999px; white-space: nowrap; align-self: start; }
+.amb-state--approved { color: #14603a; background: rgba(82, 183, 136, .16); }
+.amb-state--pending { color: #8a5a06; background: rgba(233, 163, 25, .18); }
+.amb-state--suspended { color: #8a5a06; background: rgba(233, 163, 25, .22); }
+.amb-state--removed { color: #6b7280; background: rgba(107, 114, 128, .15); }
+.amb-state--rejected { color: #b3261e; background: rgba(179, 38, 30, .12); }
+
+/* ───────── Annuaire public ───────── */
+.ann-search { display: flex; gap: 12px; margin: 8px 0 24px; }
+.ann-search__field { position: relative; flex: 1; display: flex; align-items: center; }
+.ann-search__field svg { position: absolute; left: 16px; width: 20px; height: 20px; fill: none; stroke: var(--text-tertiary); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.ann-search__field input { width: 100%; padding: 16px 18px 16px 48px; font: inherit; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; transition: border-color .2s, box-shadow .2s; }
+.ann-search__field input::placeholder { color: var(--text-tertiary); }
+.ann-search__field input:focus { outline: none; border-color: var(--pine-bright); box-shadow: 0 0 0 3px rgba(82, 183, 136, .15); }
+.ann-search .btn { flex: none; padding-inline: 26px; }
+
+.ann-results { display: flex; flex-direction: column; gap: 16px; min-height: 80px; }
+.ann-count { font-size: 13px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.ann-idle, .ann-none, .ann-loading { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 40px 20px; color: var(--text-secondary); }
+.ann-idle__ico, .ann-none__ico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border); }
+.ann-idle__ico svg, .ann-none__ico svg { width: 24px; height: 24px; fill: none; stroke: var(--text-tertiary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ann-none__ico { background: #fdecea; border-color: #f5c2bd; }
+.ann-none__ico svg { stroke: #c0392b; }
+.ann-none h2 { color: var(--text-primary); }
+.ann-none a, .ann-help a { color: var(--pine); text-decoration: underline; text-underline-offset: 2px; }
+[data-theme="dark"] .ann-none a, [data-theme="dark"] .ann-help a { color: var(--pine-bright); }
+
+.ann-card { display: flex; gap: 18px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--app-radius); box-shadow: 0 1px 3px rgba(13, 40, 24, .05); }
+.ann-card--actif { border-color: rgba(82, 183, 136, .5); }
+.ann-card--suspendu { border-color: rgba(233, 163, 25, .55); }
+.ann-card--retire { opacity: .85; }
+.ann-card__photo { flex: none; width: 76px; height: 76px; border-radius: 16px; overflow: hidden; background: var(--surface-2); display: grid; place-items: center; }
+.ann-card__photo img { width: 100%; height: 100%; object-fit: cover; }
+.ann-avatar { font-family: var(--font-mono); font-weight: 500; font-size: 24px; color: #fff; letter-spacing: .04em; width: 100%; height: 100%; display: grid; place-items: center; background: linear-gradient(135deg, var(--pine) 0%, var(--pine-light) 100%); }
+.ann-card--actif .ann-avatar { background: linear-gradient(135deg, var(--pine-700) 0%, var(--pine-bright) 100%); }
+.ann-card__main { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ann-verify { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #1a7a4a; margin: 0; }
+.ann-verify__ico { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #1a7a4a; color: #fff; font-weight: 800; }
+.ann-verify__ico svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ann-verify--warn { color: #a9700a; }
+.ann-verify--warn .ann-verify__ico { background: #e9a319; color: #3a2a05; }
+.ann-name { font-size: clamp(20px, 3vw, 24px); color: var(--text-primary); }
+.ann-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 20px; margin: 0; }
+.ann-meta dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-tertiary); margin-bottom: 2px; }
+.ann-meta dd { margin: 0; color: var(--text-primary); font-weight: 500; }
+.ann-code { font-family: var(--font-mono); letter-spacing: .08em; }
+.ann-badge { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+.ann-badge--actif { color: #14603a; background: rgba(82, 183, 136, .16); }
+.ann-badge--suspendu { color: #8a5a06; background: rgba(233, 163, 25, .18); }
+.ann-badge--retire { color: #6b7280; background: rgba(107, 114, 128, .15); }
+.ann-warn { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.ann-help { font-size: 13px; color: var(--text-tertiary); text-align: center; margin-top: 26px; }
+.ann-spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--pine-bright); border-radius: 50%; animation: annSpin .7s linear infinite; }
+@keyframes annSpin { to { transform: rotate(360deg); } }
+@media (max-width: 520px) {
+  .ann-search { flex-direction: column; }
+  .ann-card { flex-direction: column; }
+  .ann-card__photo { width: 64px; height: 64px; }
+}

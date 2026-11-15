@@ -24,10 +24,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script>try{if(localStorage.getItem('unusuall-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
-  <link rel="stylesheet" href="assets/css/app.css?v=8">
-  <script src="assets/js/app.js?v=8" defer></script>
+  <link rel="stylesheet" href="assets/css/app.css?v=9">
+  <script src="assets/js/app.js?v=9" defer></script>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <script type="module" src="assets/js/account.js?v=8"></script>
+  <script type="module" src="assets/js/account.js?v=9"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -86,6 +86,7 @@
       <a href="produits.html" class="app-dock__item" data-page="produits.html"><span class="app-dock__icon app-dock__icon--olivia"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><path d="M17.25 13.5v7.5M13.5 17.25H21"/></svg></span><span class="app-dock__label">Produits</span></a>
       <a href="gains.html" class="app-dock__item" data-page="gains.html"><span class="app-dock__icon app-dock__icon--omi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 16h16"/><path d="M8 16V8"/><path d="M12 16V11"/><path d="M16 16V6"/></svg></span><span class="app-dock__label">Gains</span></a>
       <a href="avantages.html" class="app-dock__item" data-page="avantages.html"><span class="app-dock__icon app-dock__icon--perks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6 .9-4.35 4.25 1 6L12 16.8l-5.4 2.85 1-6L3.3 9.4l6-.9z"/></svg></span><span class="app-dock__label">Avantages</span></a>
+      <a href="annuaire.html" class="app-dock__item" data-page="annuaire.html"><span class="app-dock__icon app-dock__icon--annuaire"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><span class="app-dock__label">Annuaire</span></a>
       <a href="postuler.html" class="app-dock__item" data-page="postuler.html"><span class="app-dock__icon app-dock__icon--contact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14l2 2 4-4"/></svg></span><span class="app-dock__label">Postuler</span></a>
       <a href="espace.html" class="app-dock__item" data-page="espace.html"><span class="app-dock__icon app-dock__icon--sofia"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="app-dock__label">Mon espace</span></a>
     </nav>
@@ -107,24 +108,36 @@
           <div id="space" aria-live="polite"><p class="amb-empty">Chargement de votre espace…</p></div>
 
           <form class="pg-form amb-apply-form" id="apply-form" novalidate hidden>
-            <div class="pg-card__head span-2"><h2>Votre candidature</h2><p>Les champs marqués d'un * sont obligatoires.</p></div>
+            <div class="pg-card__head span-2"><h2>Votre candidature</h2><p>Les champs marqués d'un * sont obligatoires. Une candidature complète et sérieuse est traitée en priorité.</p></div>
             <div class="form-group"><label for="f-name">Nom et prénom *</label><input id="f-name" name="nom" type="text" class="form-control" autocomplete="name" required maxlength="100"></div>
             <div class="form-group"><label for="f-email">E-mail</label><input id="f-email" name="email" type="email" class="form-control" readonly></div>
-            <div class="form-group"><label for="f-phone">Numéro WhatsApp *</label><input id="f-phone" name="whatsapp" type="tel" class="form-control" autocomplete="tel" placeholder="+229 …" required maxlength="30"></div>
+
+            <div class="form-group"><label for="f-phone">Téléphone WhatsApp *</label><input id="f-phone" name="whatsapp" type="tel" class="form-control" autocomplete="tel" inputmode="tel" placeholder="+229 …" required maxlength="30"></div>
             <div class="form-group"><label for="f-city">Ville *</label><input id="f-city" name="ville" type="text" class="form-control" autocomplete="address-level2" required maxlength="80"></div>
+            <div class="form-group"><label for="f-district">Quartier *</label><input id="f-district" name="quartier" type="text" class="form-control" autocomplete="address-level3" required maxlength="80" placeholder="Ex. : Fidjrossè, Akpakpa…"></div>
+            <div class="form-group"><label for="f-job">Profession actuelle *</label><input id="f-job" name="profession" type="text" class="form-control" required maxlength="100" placeholder="Ex. : étudiant, commercial, gérant…"></div>
+
+            <fieldset class="form-group span-2 amb-choose" data-require-group="reseau">
+              <legend>Votre réseau * <small>(au moins un)</small></legend>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Restaurateurs que je connais"><span><b>Restaurateurs</b><small>Je connais des gérants de restaurants, maquis, bars…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Communauté (église, quartier, association)"><span><b>Communauté</b><small>Église, quartier, association, école…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Réseaux sociaux"><span><b>Réseaux sociaux</b><small>Facebook, Instagram, TikTok, WhatsApp…</small></span></label>
+              <label class="amb-choice"><input type="checkbox" name="reseau" value="Autre"><span><b>Autre</b><small>Un autre réseau utile pour convaincre.</small></span></label>
+            </fieldset>
+
+            <div class="form-group span-2"><label for="f-profile-link">Lien vers un profil (Facebook, Instagram, LinkedIn…) *</label><input id="f-profile-link" name="profilLien" type="url" class="form-control" required maxlength="300" placeholder="https://…"><p class="amb-hint">Pour vérifier que votre profil existe. Il ne sera pas publié.</p></div>
+            <div class="form-group span-2"><label for="f-photo">Lien vers une photo de profil (facultatif)</label><input id="f-photo" name="photo" type="url" class="form-control" maxlength="300" placeholder="https://…"><p class="amb-hint">Ajoutée à votre fiche dans l'annuaire public.</p></div>
+
             <fieldset class="form-group span-2 amb-choose">
               <legend>Les produits que vous voulez représenter *</legend>
               <label class="amb-choice"><input type="checkbox" name="produits" value="Epicure" checked required><span><b>Epicure</b><small>Gestion de restaurant · ouvert</small></span></label>
               <label class="amb-choice is-soon"><input type="checkbox" name="produits_futurs" value="Suite SOFIA"><span><b>Suite SOFIA</b><small>Santé · me prévenir à l'ouverture</small></span></label>
               <label class="amb-choice is-soon"><input type="checkbox" name="produits_futurs" value="OMI"><span><b>OMI</b><small>Données mobiles · me prévenir à l'ouverture</small></span></label>
             </fieldset>
-            <div class="form-group span-2"><label for="f-profile">Vous êtes plutôt… *</label>
-              <select id="f-profile" name="profil" class="form-control" required>
-                <option value="">Choisissez</option><option>Étudiant(e)</option><option>Commercial(e) ou vendeur(se)</option><option>Dans la restauration</option><option>Créateur(trice) de contenu</option><option>Autre</option>
-              </select>
-            </div>
-            <div class="form-group span-2"><label for="f-how">Comment comptez-vous faire connaître nos produits ? *</label><textarea id="f-how" name="methode" class="form-control" rows="4" required maxlength="2000" placeholder="Ex. : je connais beaucoup de restaurants à Calavi, je ferai des visites et je partagerai sur mes réseaux…"></textarea></div>
-            <div class="form-group span-2"><label for="f-social">Vos réseaux sociaux (facultatif)</label><input id="f-social" name="reseaux" type="text" class="form-control" maxlength="300" placeholder="Lien Facebook, Instagram, TikTok, LinkedIn…"></div>
+
+            <div class="form-group span-2"><label for="f-motivation">Comment comptes-tu présenter Epicure à un restaurateur ? *</label><textarea id="f-motivation" name="motivation" class="form-control" rows="5" required minlength="80" maxlength="2000" placeholder="Décrivez concrètement votre approche : ce que vous direz au gérant, comment vous gérerez ses objections, comment vous le ferez essayer…"></textarea><p class="amb-hint">Une réponse détaillée (80 caractères minimum) montre que vous avez lu la formation.</p></div>
+
+            <label class="amb-agree span-2"><input type="checkbox" name="annuaire" value="1" checked> J'accepte d'apparaître dans l'<a href="annuaire.html">annuaire public</a> des ambassadeurs certifiés (nom, ville, produits, photo).</label>
             <label class="amb-agree span-2"><input type="checkbox" name="charte" value="acceptee" required> J'accepte la <a href="avantages.html">charte de l'ambassadeur</a> et le traitement de mes données pour étudier ma candidature. *</label>
             <p class="form-error" id="apply-error" role="alert" hidden></p>
             <button class="btn btn--primary" type="submit">Envoyer ma candidature →</button>
@@ -144,6 +157,7 @@
             <a href="produits.html">Produits</a>
             <a href="gains.html">Gains</a>
             <a href="avantages.html">Avantages</a>
+            <a href="annuaire.html">Annuaire</a>
             <a href="postuler.html">Postuler</a>
           </div>
           <div class="app-footer__col">
@@ -163,6 +177,7 @@
     <a href="produits.html" class="mobile-dock__item" data-page="produits.html"><span class="mobile-dock__icon app-dock__icon--olivia"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><path d="M17.25 13.5v7.5M13.5 17.25H21"/></svg></span><span class="mobile-dock__label">Produits</span></a>
     <a href="gains.html" class="mobile-dock__item" data-page="gains.html"><span class="mobile-dock__icon app-dock__icon--omi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 16h16"/><path d="M8 16V8"/><path d="M12 16V11"/><path d="M16 16V6"/></svg></span><span class="mobile-dock__label">Gains</span></a>
     <a href="avantages.html" class="mobile-dock__item" data-page="avantages.html"><span class="mobile-dock__icon app-dock__icon--perks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6 .9-4.35 4.25 1 6L12 16.8l-5.4 2.85 1-6L3.3 9.4l6-.9z"/></svg></span><span class="mobile-dock__label">Avantages</span></a>
+    <a href="annuaire.html" class="mobile-dock__item" data-page="annuaire.html"><span class="mobile-dock__icon app-dock__icon--annuaire"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><span class="mobile-dock__label">Annuaire</span></a>
     <a href="postuler.html" class="mobile-dock__item" data-page="postuler.html"><span class="mobile-dock__icon app-dock__icon--contact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14l2 2 4-4"/></svg></span><span class="mobile-dock__label">Postuler</span></a>
     <a href="espace.html" class="mobile-dock__item" data-page="espace.html"><span class="mobile-dock__icon app-dock__icon--sofia"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="mobile-dock__label">Mon espace</span></a>
   </nav>
