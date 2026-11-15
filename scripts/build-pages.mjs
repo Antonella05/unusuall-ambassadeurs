@@ -547,7 +547,7 @@ PAGES.push({
   body: `
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Annuaire public</p>
-            <h1 class="pg-title">Vérifiez un <span class="flame-text">Ambassadeur UNUSUALL</span></h1>
+            <h1 class="pg-title">Vérifiez un Ambassadeur <span class="flame-text">UNUSUALL</span></h1>
             <p>Recherchez par nom, code ambassadeur ou numéro de téléphone.</p>
           </div>
 
