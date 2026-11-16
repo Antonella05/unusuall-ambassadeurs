@@ -152,6 +152,9 @@
 [data-theme="dark"] .amb-link { color: var(--pine-bright); }
 .amb-hint { margin: 0; font-size: 12.5px; color: var(--text-tertiary); }
 .amb-info { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; color: var(--text-primary); background: rgba(82, 183, 136, .14); border: 0.5px solid rgba(82, 183, 136, .45); }
+/* Le script bascule l'attribut hidden ; la règle d'origine (.form-error{display:none})
+   empêchait le message de s'afficher une fois hidden retiré. */
+.form-error { display: block; margin: 12px 0 0; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; }
 .pg-card .form-error { margin: 12px 0 0; }
 
 .amb-space-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: clamp(18px, 3vh, 28px); }
@@ -359,4 +362,55 @@
   .ann-search { flex-direction: column; }
   .ann-card { flex-direction: column; }
   .ann-card__photo { width: 64px; height: 64px; }
+}
+
+/* ───────── Mobile : formulaires, lisibilité, cibles tactiles ───────── */
+@media (max-width: 767px) {
+  /* Formulaire sur une seule colonne (la base du site reste en deux colonnes) */
+  .pg-form { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+  .pg-form .span-2 { grid-column: auto; }
+
+  /* Champs : 16 px évite le zoom automatique sur iPhone, 48 px de haut au doigt */
+  .form-control { font-size: 16px !important; padding: 13px 14px !important; min-height: 48px; }
+  textarea.form-control { min-height: 140px !important; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label, .pg-form .form-group label { font-size: 12px; margin-bottom: 6px; }
+
+  /* Boutons : cible tactile confortable */
+  .btn, .btn--primary, .btn--ghost, .btn--white { min-height: 44px; padding: 12px 20px !important; font-size: 14px !important; }
+  .amb-link { padding: 8px 0; }
+
+  /* Titres : taille stable, mesurée sur la largeur et non sur la hauteur d'écran */
+  .pg-title, .amb-hero .pg-title, .ep-hero .pg-title { font-size: clamp(28px, 8.4vw, 36px); line-height: 1.14; }
+  .pg-lead { font-size: 15px; line-height: 1.6; }
+
+  /* Cartes : marges internes resserrées */
+  .pg-card, .amb-apply-form, .pg-visual, .amb-settings { padding: 18px 16px; border-radius: 16px; }
+
+  /* Barre système : tout tient sur une ligne, boutons faciles à toucher */
+  .sys-bar { padding: 0 12px; gap: 10px; font-size: 11px; }
+  .sys-bar__left, .sys-bar__right { gap: 10px; min-width: 0; }
+  .sys-bar__brand { font-size: 11px; white-space: nowrap; }
+  .status-live { display: none; }
+  .sys-bar__btn { min-height: 32px; padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
+  .sys-bar__actions { gap: 6px; }
+
+  /* Dock mobile : icônes et libellés lisibles sur 5 onglets */
+  .mobile-dock { padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); }
+  .mobile-dock__item { gap: 4px; padding: 6px 0 8px; }
+  .mobile-dock__icon { width: 30px; height: 30px; }
+  .mobile-dock__icon svg { width: 19px; height: 19px; }
+  .mobile-dock__label { font-size: 10.5px; font-weight: 600; }
+
+  /* Sous-navigation : deux cibles pleine largeur */
+  .amb-subnav { display: flex; width: 100%; margin-bottom: 18px; }
+  .amb-subnav a { flex: 1 1 0; display: flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 12px; text-align: center; }
+
+  /* Connexion / inscription */
+  .amb-tabs button { min-height: 44px; font-size: 14px; }
+
+  /* Annuaire */
+  .ann-search { flex-direction: column; gap: 10px; }
+  .ann-search .btn { width: 100%; justify-content: center; }
+  .ann-search__field input { font-size: 16px; min-height: 48px; }
 }

@@ -52,24 +52,43 @@ const referralLink = (code) => `${FUNCTIONS_ORIGIN}/go?a=${encodeURIComponent(co
 const qrLink = (code) => `${FUNCTIONS_ORIGIN}/qr?a=${encodeURIComponent(code || '')}`;
 
 const ERRORS = {
-  'auth/invalid-email': "Cette adresse e-mail n'est pas valide.",
+  'auth/invalid-email': "Cette adresse e-mail n'est pas valide (exemple : nom@domaine.com).",
+  'auth/missing-email': 'Indiquez votre adresse e-mail.',
   'auth/missing-password': 'Indiquez votre mot de passe.',
-  'auth/invalid-credential': 'E-mail ou mot de passe incorrect.',
-  'auth/wrong-password': 'E-mail ou mot de passe incorrect.',
-  'auth/user-not-found': 'Aucun compte avec cette adresse e-mail.',
-  'auth/email-already-in-use': 'Un compte existe déjà avec cette adresse. Connectez-vous.',
+  'auth/invalid-credential': 'E-mail ou mot de passe incorrect. Vérifiez la casse, puis réessayez.',
+  'auth/invalid-login-credentials': 'E-mail ou mot de passe incorrect. Vérifiez la casse, puis réessayez.',
+  'auth/wrong-password': 'E-mail ou mot de passe incorrect. Vérifiez la casse, puis réessayez.',
+  'auth/user-not-found': 'Aucun compte avec cette adresse e-mail. Vérifiez l’orthographe ou créez un compte.',
+  'auth/email-already-in-use': 'Un compte existe déjà avec cette adresse. Connectez-vous plutôt.',
   'auth/weak-password': 'Le mot de passe doit contenir au moins 8 caractères.',
-  'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
-  'auth/network-request-failed': 'Connexion internet impossible. Vérifiez votre réseau.',
+  'auth/invalid-password': 'Le mot de passe doit contenir au moins 8 caractères.',
+  'auth/user-disabled': 'Ce compte a été désactivé. Écrivez à services@unusuall.online.',
+  'auth/operation-not-allowed': "La connexion par e-mail n'est pas disponible pour le moment. Écrivez à services@unusuall.online.",
+  'auth/unauthorized-domain': "Ce site n'est pas autorisé par le service de connexion. Écrivez à services@unusuall.online.",
+  'auth/too-many-requests': 'Trop de tentatives de connexion. Patientez quelques minutes puis réessayez.',
+  'auth/quota-exceeded': 'Le service de connexion reçoit trop de demandes. Réessayez plus tard.',
+  'auth/network-request-failed': 'Connexion internet impossible. Vérifiez votre réseau puis réessayez.',
+  'auth/internal-error': 'Erreur interne du service de connexion. Réessayez dans un instant.',
   'permission-denied': 'Action non autorisée. Reconnectez-vous puis réessayez.',
-  'unauthenticated': 'Session expirée. Reconnectez-vous puis réessayez.',
-  'failed-precondition': 'Aucune commission payable sur cette période.',
+  'unauthenticated': 'Votre session a expiré. Reconnectez-vous puis réessayez.',
+  'failed-precondition': 'Cette action ne peut pas être effectuée dans l’état actuel.',
   'not-found': 'Élément introuvable. Rechargez la page puis réessayez.',
-  'invalid-argument': 'Informations manquantes ou invalides.'
+  'invalid-argument': 'Informations manquantes ou invalides. Vérifiez le formulaire.',
+  'already-exists': 'Cet élément existe déjà.',
+  'unavailable': 'Service momentanément indisponible. Vérifiez votre connexion puis réessayez.',
+  'deadline-exceeded': 'Le serveur met trop de temps à répondre. Réessayez dans un instant.',
+  'resource-exhausted': 'Trop de demandes en peu de temps. Patientez quelques minutes.',
+  'aborted': 'L’opération a été interrompue. Réessayez.',
+  'cancelled': 'L’opération a été annulée. Réessayez.'
 };
 const errText = (e) => ERRORS[e?.code] || ERRORS[String(e?.code || '').replace('functions/', '')]
   || (String(e?.code || '').startsWith('functions/') && e?.message)
   || 'Une erreur est survenue. Réessayez dans un instant.';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const emailOk = (v) => EMAIL_RE.test(String(v || '').trim());
+const flag = (el, ko = true) => { if (el) el.setAttribute('aria-invalid', String(ko)); };
+const clearFlags = (...els) => els.forEach((el) => flag(el, false));
 
 function busy(btn, on, label) {
   if (!btn) return;
@@ -132,39 +151,67 @@ if (PAGE === 'login') {
 
   forms.login.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = forms.login.querySelector('button[type=submit]');
-    show(err, ''); busy(btn, true, 'Connexion…');
+    const f = forms.login, btn = f.querySelector('button[type=submit]');
+    const mail = f.email.value.trim(), pass = f.password.value;
+    show(err, '');
+    clearFlags(f.email, f.password);
+    if (!mail) { flag(f.email); show(err, 'Indiquez votre adresse e-mail pour vous connecter.'); return f.email.focus(); }
+    if (!emailOk(mail)) { flag(f.email); show(err, `« ${mail} » n'est pas une adresse e-mail valide. Exemple : nom@domaine.com`); return f.email.focus(); }
+    if (!pass) { flag(f.password); show(err, 'Indiquez votre mot de passe.'); return f.password.focus(); }
+    busy(btn, true, 'Connexion…');
     try {
       document.body.dataset.working = '1';
-      await signInWithEmailAndPassword(auth, forms.login.email.value.trim(), forms.login.password.value);
+      await signInWithEmailAndPassword(auth, mail, pass);
       location.replace(next);
-    } catch (ex) { delete document.body.dataset.working; show(err, errText(ex)); busy(btn, false); }
+    } catch (ex) {
+      console.error('[connexion]', ex);
+      delete document.body.dataset.working;
+      show(err, errText(ex));
+      busy(btn, false);
+    }
   });
 
   forms.signup.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = forms.signup, btn = f.querySelector('button[type=submit]');
     show(err, '');
-    if (f.nom.value.trim().length < 2) return show(err, 'Indiquez votre nom et prénom.');
-    if (f.password.value.length < 8) return show(err, 'Le mot de passe doit contenir au moins 8 caractères.');
-    if (f.password.value !== f.confirm.value) return show(err, 'Les deux mots de passe ne sont pas identiques.');
+    clearFlags(f.nom, f.email, f.password, f.confirm);
+    const nom = f.nom.value.trim(), mail = f.email.value.trim(), pass = f.password.value;
+    if (nom.length < 2) { flag(f.nom); show(err, 'Indiquez votre nom et prénom (2 caractères minimum).'); return f.nom.focus(); }
+    if (!mail) { flag(f.email); show(err, 'Indiquez votre adresse e-mail.'); return f.email.focus(); }
+    if (!emailOk(mail)) { flag(f.email); show(err, `« ${mail} » n'est pas une adresse e-mail valide. Exemple : nom@domaine.com`); return f.email.focus(); }
+    if (pass.length < 8) { flag(f.password); show(err, `Votre mot de passe compte ${pass.length} caractère${pass.length > 1 ? 's' : ''} : il en faut au moins 8.`); return f.password.focus(); }
+    if (pass !== f.confirm.value) { flag(f.confirm); show(err, 'Les deux mots de passe ne sont pas identiques. Retapez le même mot de passe dans les deux champs.'); return f.confirm.focus(); }
     busy(btn, true, 'Création du compte…');
     try {
       document.body.dataset.working = '1';
-      const cred = await createUserWithEmailAndPassword(auth, f.email.value.trim(), f.password.value);
-      await updateProfile(cred.user, { displayName: f.nom.value.trim() });
+      const cred = await createUserWithEmailAndPassword(auth, mail, pass);
+      await updateProfile(cred.user, { displayName: nom });
       location.replace('espace.html');
-    } catch (ex) { delete document.body.dataset.working; show(err, errText(ex)); busy(btn, false); }
+    } catch (ex) {
+      console.error('[inscription]', ex);
+      delete document.body.dataset.working;
+      show(err, errText(ex));
+      busy(btn, false);
+    }
   });
 
   forms.reset.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = forms.reset.querySelector('button[type=submit]');
-    show(err, ''); busy(btn, true, 'Envoi…');
+    const f = forms.reset, btn = f.querySelector('button[type=submit]');
+    show(err, '');
+    clearFlags(f.email);
+    const mail = f.email.value.trim();
+    if (!mail) { flag(f.email); show(err, 'Indiquez votre adresse e-mail pour recevoir le lien.'); return f.email.focus(); }
+    if (!emailOk(mail)) { flag(f.email); show(err, `« ${mail} » n'est pas une adresse e-mail valide. Exemple : nom@domaine.com`); return f.email.focus(); }
+    busy(btn, true, 'Envoi…');
     try {
-      await sendPasswordResetEmail(auth, forms.reset.email.value.trim());
+      await sendPasswordResetEmail(auth, mail);
       show(info, 'Si un compte existe avec cette adresse, vous allez recevoir un e-mail pour choisir un nouveau mot de passe. Pensez à regarder vos spams.');
-    } catch (ex) { show(err, errText(ex)); }
+    } catch (ex) {
+      console.error('[mot de passe oublié]', ex);
+      show(err, errText(ex));
+    }
     busy(btn, false);
   });
 }
@@ -183,7 +230,10 @@ if (PAGE === 'space') {
       const a = snap.data();
       if (a.status === 'approved') return showDashboard(user, a);
       root.innerHTML = statusCard(a);
-    } catch (ex) { root.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
+    } catch (ex) {
+      console.error('[espace]', ex);
+      root.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`;
+    }
   });
 
   function statusCard(a) {
@@ -210,32 +260,60 @@ if (PAGE === 'space') {
     form.hidden = false;
     form.email.value = user.email || '';
     form.nom.value = user.displayName || '';
+    form.addEventListener('input', (e) => {
+      if (e.target.getAttribute?.('aria-invalid') === 'true') flag(e.target, false);
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = $('#apply-error');
       show(err, '');
-      const invalid = [];
-      const mark = (el, ko) => { if (!el) return; el.setAttribute('aria-invalid', String(ko)); if (ko) invalid.push(el); };
+      const missing = [], wrong = [], first = [];
+      const need = (el, label) => {
+        const empty = el.type === 'checkbox' ? !el.checked : !el.value.trim();
+        flag(el, empty);
+        if (empty) { missing.push(label); first.push(el); }
+      };
+      const bad = (el, label) => { flag(el, true); wrong.push(label); first.push(el); };
 
-      $$('[required]', form).forEach((f) => mark(f, f.type === 'checkbox' ? !f.checked : !f.value.trim()));
+      need(form.nom, 'votre nom et prénom');
+      need(form.whatsapp, 'votre téléphone WhatsApp');
+      need(form.ville, 'votre ville');
+      need(form.quartier, 'votre quartier');
+      need(form.profession, 'votre profession actuelle');
+      need(form.profilLien, 'le lien vers un profil');
+      need(form.charte, 'la case « J’accepte la charte »');
+
+      const produits = $$('input[name=produits]', form);
+      if (!produits.some((b) => b.checked)) {
+        produits.forEach((b) => flag(b));
+        missing.push('au moins un produit (Epicure)');
+        first.push(produits[0]);
+      }
 
       const reseauBoxes = $$('input[name=reseau]', form);
-      const noReseau = !reseauBoxes.some((b) => b.checked);
-      if (noReseau) invalid.push(reseauBoxes[0]);
+      if (!reseauBoxes.some((b) => b.checked)) {
+        reseauBoxes.forEach((b) => flag(b));
+        missing.push('au moins un type de réseau');
+        first.push(reseauBoxes[0]);
+      }
 
       const motivation = form.motivation.value.trim();
-      if (motivation.length < 80) mark(form.motivation, true);
+      if (!motivation) { flag(form.motivation); missing.push('votre motivation'); first.push(form.motivation); }
+      else if (motivation.length < 80) bad(form.motivation, `la motivation doit faire 80 caractères minimum (il en manque ${80 - motivation.length})`);
 
       const profilLien = form.profilLien.value.trim();
-      if (!isHttpUrl(profilLien)) mark(form.profilLien, true);
+      if (profilLien && !isHttpUrl(profilLien)) bad(form.profilLien, 'le lien de profil doit commencer par https://');
       const photo = form.photo.value.trim();
-      if (photo && !isHttpUrl(photo)) mark(form.photo, true);
+      if (photo && !isHttpUrl(photo)) bad(form.photo, 'le lien de photo doit commencer par https:// (ou rester vide)');
 
-      if (invalid.length) {
-        show(err, noReseau ? 'Indiquez au moins un type de réseau.'
-          : motivation.length > 0 && motivation.length < 80 ? 'Détaillez votre motivation (80 caractères minimum).'
-          : 'Vérifiez les liens de profil et de photo, puis complétez les champs obligatoires.');
-        return invalid[0].focus();
+      if (missing.length || wrong.length) {
+        show(err, [
+          missing.length ? `Merci de compléter : ${missing.join(', ')}.` : '',
+          wrong.length ? `À corriger : ${wrong.join(' ; ')}.` : ''
+        ].filter(Boolean).join(' '));
+        first[0]?.focus({ preventScroll: true });
+        err?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
       }
 
       const btn = form.querySelector('button[type=submit]');
@@ -271,7 +349,11 @@ if (PAGE === 'space') {
         fetch(FORMSPREE, { method: 'POST', body: mail, headers: { Accept: 'application/json' } }).catch(() => {});
         form.hidden = true;
         root.innerHTML = statusCard({ ...data, createdAt: new Date() });
-      } catch (ex) { show(err, errText(ex)); busy(btn, false); }
+      } catch (ex) {
+        console.error('[candidature]', ex);
+        show(err, errText(ex));
+        busy(btn, false);
+      }
     });
   }
 
