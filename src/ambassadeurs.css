@@ -5,10 +5,16 @@
 /* Icônes du dock : svg en ligne (le site les injecte par script) */
 .app-dock__icon svg, .mobile-dock__icon svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* Seul « Mon espace » est orange ; les autres onglets du menu restent verts. */
-.app-dock__icon--perks { background: linear-gradient(135deg, var(--pine) 0%, var(--pine-light) 100%); }
 .app-dock__icon--annuaire { background: linear-gradient(135deg, var(--pine) 0%, var(--pine-light) 100%); }
 .app-dock__icon--sofia { background: linear-gradient(135deg, var(--accent) 0%, #c4841a 100%); }
 .app-dock__icon--sofia svg { stroke: var(--pine-900); }
+
+/* Sous-navigation des pages regroupées dans le menu (Programme/Postuler, Gains/Avantages) */
+.amb-subnav { align-self: flex-start; display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 clamp(18px, 3vh, 26px); border-radius: 999px; background: var(--surface-2); border: 0.5px solid var(--border); }
+.amb-subnav a { padding: 8px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; line-height: 1.2; color: var(--text-secondary); text-decoration: none; transition: color .18s ease, background .18s ease; }
+.amb-subnav a:hover { color: var(--text-primary); }
+.amb-subnav a.is-active { color: #fff; background: var(--pine); }
+[data-theme="dark"] .amb-subnav a.is-active { color: var(--pine-900); }
 
 /* Haut de page */
 .amb-hero__mark { width: 72px; height: 72px; animation: ambBob 5s ease-in-out infinite; }

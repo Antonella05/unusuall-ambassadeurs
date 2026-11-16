@@ -7,26 +7,22 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '9';
+const V = '10';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
   products: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><path d="M17.25 13.5v7.5M13.5 17.25H21"/></svg>',
   gains: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 16h16"/><path d="M8 16V8"/><path d="M12 16V11"/><path d="M16 16V6"/></svg>',
-  perks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6 .9-4.35 4.25 1 6L12 16.8l-5.4 2.85 1-6L3.3 9.4l6-.9z"/></svg>',
   user: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
-  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
-  apply: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14l2 2 4-4"/></svg>'
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
 };
 
 const NAV = [
-  { href: 'index.html', label: 'Programme', icon: 'home', cls: 'home' },
-  { href: 'produits.html', label: 'Produits', icon: 'products', cls: 'olivia' },
-  { href: 'gains.html', label: 'Gains', icon: 'gains', cls: 'omi' },
-  { href: 'avantages.html', label: 'Avantages', icon: 'perks', cls: 'perks' },
-  { href: 'annuaire.html', label: 'Annuaire', icon: 'search', cls: 'annuaire' },
-  { href: 'postuler.html', label: 'Postuler', icon: 'apply', cls: 'contact' },
-  { href: 'espace.html', label: 'Mon espace', icon: 'user', cls: 'sofia' }
+  { href: 'index.html', label: 'Programme', icon: 'home', cls: 'home', group: ['index.html', 'postuler.html'] },
+  { href: 'produits.html', label: 'Produits', icon: 'products', cls: 'olivia', group: ['produits.html'] },
+  { href: 'gains.html', label: 'Gains', icon: 'gains', cls: 'omi', group: ['gains.html', 'avantages.html'] },
+  { href: 'annuaire.html', label: 'Annuaire', icon: 'search', cls: 'annuaire', group: ['annuaire.html'] },
+  { href: 'espace.html', label: 'Mon espace', icon: 'user', cls: 'sofia', group: ['espace.html', 'connexion.html'] }
 ];
 
 const THEME_BTN = `<button id="theme-toggle" class="sys-bar__btn" aria-label="Changer de thème clair/sombre">
@@ -44,8 +40,8 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
 function page({ file, title, desc, windowTitle, back, body, jsonld, account, script, noindex }) {
   const url = file === 'index.html' ? `${ORIGIN}/` : `${ORIGIN}/${file}`;
-  const dock = NAV.map((n) => `      <a href="${n.href}" class="app-dock__item" data-page="${n.href}"><span class="app-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="app-dock__label">${n.label}</span></a>`).join('\n');
-  const mdock = NAV.map((n) => `    <a href="${n.href}" class="mobile-dock__item" data-page="${n.href}"><span class="mobile-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="mobile-dock__label">${n.label}</span></a>`).join('\n');
+  const dock = NAV.map((n) => `      <a href="${n.href}" class="app-dock__item" data-page="${(n.group || [n.href]).join(' ')}"><span class="app-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="app-dock__label">${n.label}</span></a>`).join('\n');
+  const mdock = NAV.map((n) => `    <a href="${n.href}" class="mobile-dock__item" data-page="${(n.group || [n.href]).join(' ')}"><span class="mobile-dock__icon app-dock__icon--${n.cls}">${ICON[n.icon]}</span><span class="mobile-dock__label">${n.label}</span></a>`).join('\n');
   const ld = JSON.stringify({
     '@context': 'https://schema.org',
     '@graph': [
@@ -172,6 +168,10 @@ const FINAL = (title, text, alt = ['gains.html', 'Voir les gains']) => `
             </div>
           </div>`;
 
+const SUBNAV = (items, current) => `          <nav class="amb-subnav" aria-label="Sous-navigation">
+${items.map(([href, label]) => `            <a href="${href}"${href === current ? ' class="is-active" aria-current="page"' : ''}>${label}</a>`).join('\n')}
+          </nav>`;
+
 const PAGES = [];
 
 /* 1. Programme */
@@ -192,7 +192,7 @@ PAGES.push({
   title: 'Devenez Ambassadeur UNUSUALL · Programme Ambassadeurs',
   desc: "Parlez de nos produits autour de vous et gagnez de l'argent chaque mois. 30 % du premier mois, puis 10 % chaque mois pendant un an. Inscription gratuite.",
   windowTitle: 'Programme Ambassadeurs',
-  body: `
+  body: `${SUBNAV([['index.html', 'Programme'], ['postuler.html', 'Postuler']], 'index.html')}
           <div class="amb-hero">
             <div class="pg-copy">
               <div class="pg-pills">
@@ -287,7 +287,7 @@ PAGES.push({
   desc: "30 % du premier mois, puis 10 % chaque mois pendant un an. Jusqu'à 103 870 FCFA par an pour un seul restaurant. Calculez vos gains.",
   windowTitle: 'Gains',
   back: { href: 'index.html', label: 'Programme' },
-  body: `
+  body: `${SUBNAV([['gains.html', 'Gains'], ['avantages.html', 'Avantages']], 'gains.html')}
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Vos gains</p>
             <h1 class="pg-title">Un client signé, <span class="flame-text">12 mois de revenus.</span></h1>
@@ -335,7 +335,7 @@ PAGES.push({
   desc: "Formation offerte, titre officiel, priorité d'embauche, kit complet et liberté totale.",
   windowTitle: 'Avantages',
   back: { href: 'index.html', label: 'Programme' },
-  body: `
+  body: `${SUBNAV([['gains.html', 'Gains'], ['avantages.html', 'Avantages']], 'avantages.html')}
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">En plus de l'argent</p>
             <h1 class="pg-title">Vous gagnez <span class="flame-text">bien plus.</span></h1>
@@ -384,7 +384,7 @@ PAGES.push({
   windowTitle: 'Postuler',
   back: { href: 'index.html', label: 'Programme' },
   jsonld: [{ '@type': 'FAQPage', mainEntity: FAQ.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) }],
-  body: `
+  body: `${SUBNAV([['index.html', 'Programme'], ['postuler.html', 'Postuler']], 'postuler.html')}
           <div class="ep-hero">
             <div class="pg-copy">
               <p class="pg-eyebrow">Candidature</p>

@@ -26,7 +26,7 @@
   /* Page active dans le dock */
   var here = location.pathname.split('/').pop() || 'index.html';
   $$('[data-page]').forEach(function (a) {
-    var on = a.getAttribute('data-page') === here;
+    var on = (a.getAttribute('data-page') || '').split(/\s+/).indexOf(here) !== -1;
     a.classList.toggle('active', on);
     if (on) a.setAttribute('aria-current', 'page');
   });
