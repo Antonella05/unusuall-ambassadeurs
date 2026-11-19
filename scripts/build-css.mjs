@@ -15,7 +15,7 @@ const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const run = (args) => execFileSync(npx, ['--yes', ...args], { cwd: root, stdio: ['ignore', 'inherit', 'inherit'], shell: process.platform === 'win32' });
 
 // Classes ajoutées par le script ou par l'état de la page : toujours conservées
-const SAFELIST = ['html', 'body', ':root', 'is-in', 'ep-fx', 'active'];
+const SAFELIST = ['html', 'body', ':root', 'is-in', 'ep-fx', 'active', 'brand-gradient'];
 
 try {
   const full = path.join(tmp, 'full.css');
