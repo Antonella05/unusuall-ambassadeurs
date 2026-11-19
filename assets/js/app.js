@@ -804,3 +804,199 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
+/* ============================================
+   UNUSUALL — Annonces (barre du haut)
+   Bouton mégaphone à côté du bouton musique, avec une pastille tant
+   qu'il reste une annonce non lue. Au clic, un panneau liste les annonces.
+   - Pour ajouter une annonce : ajouter un objet EN TÊTE de ANNOUNCEMENTS,
+     avec un « id » nouveau (la pastille réapparaît pour tout le monde).
+   - « external: true » : le lien s'ouvre dans un nouvel onglet.
+   - Copie du composant de unusuall.online (assets/js/announcements.js),
+     avec les annonces de la plateforme : garder le reste du code identique.
+   ============================================ */
+
+(function() {
+  'use strict';
+
+  var ANNOUNCEMENTS = [
+    {
+      id: 'site-officiel-2026-11',
+      tag: { fr: 'À découvrir', en: 'Discover' },
+      title: { fr: 'Le site officiel UNUSUALL', en: 'The official UNUSUALL website' },
+      text: {
+        fr: 'Fonctionnalités, tarifs et démonstrations d’Epicure et de nos suites : tout pour bien présenter ce que vous représentez.',
+        en: 'Features, pricing and demos of Epicure and our suites: everything to present what you represent.'
+      },
+      link: { href: 'https://unusuall.online/', fr: 'Visiter unusuall.online', en: 'Visit unusuall.online', external: true }
+    },
+    {
+      id: 'commissions-annuelles-2026-11',
+      tag: { fr: 'Nouveau', en: 'New' },
+      title: { fr: 'Commissions renouvelées chaque année', en: 'Commissions renewed every year' },
+      text: {
+        fr: 'Le 13e mois de chaque client rapporte de nouveau 30 %, puis 10 % les autres mois, tant qu’il reste abonné.',
+        en: 'Each customer’s 13th month pays 30 % again, then 10 % the other months, as long as they stay subscribed.'
+      },
+      link: { href: 'gains.html', fr: 'Voir mes gains possibles', en: 'See possible earnings' }
+    },
+    {
+      id: 'reglement-2026-11',
+      tag: { fr: 'Important', en: 'Important' },
+      title: { fr: 'Le règlement du programme', en: 'The program rules' },
+      text: {
+        fr: 'Paiements sans minimum et sans frais, attribution des clients, fin du partenariat : tout est écrit.',
+        en: 'Payments with no minimum and no fees, customer attribution, end of partnership: it is all written down.'
+      },
+      link: { href: 'reglement.html', fr: 'Lire le règlement', en: 'Read the rules' }
+    }
+  ];
+
+  var SEEN_KEY = 'unusuall-amb-annonces-lues';
+  var button, panel;
+
+  function lang() { return document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'fr'; }
+  function t(o) { return o[lang()] || o.fr; }
+
+  function seen() {
+    try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function unreadCount() {
+    var s = seen();
+    return ANNOUNCEMENTS.filter(function(a) { return s.indexOf(a.id) === -1; }).length;
+  }
+  function markAllSeen() {
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(ANNOUNCEMENTS.map(function(a) { return a.id; }))); } catch (e) {}
+  }
+
+  // Élément bilingue : i18n.js le retraduit tout seul au changement de langue
+  function bi(tag, cls, o) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    el.setAttribute('data-fr', o.fr);
+    el.setAttribute('data-en', o.en || o.fr);
+    el.textContent = t(o);
+    return el;
+  }
+
+  function buildButton() {
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'sys-bar__btn news-btn';
+    el.setAttribute('aria-expanded', 'false');
+    el.setAttribute('aria-controls', 'news-panel');
+    el.innerHTML =
+      '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>' +
+      '<span class="news-btn__dot" aria-hidden="true"></span>';
+    return el;
+  }
+
+  function buildPanel() {
+    var el = document.createElement('div');
+    el.id = 'news-panel';
+    el.className = 'news-panel';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-hidden', 'true');
+
+    var head = document.createElement('div');
+    head.className = 'news-panel__head';
+    head.appendChild(bi('p', 'news-panel__label', { fr: 'Annonces', en: 'News' }));
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'news-panel__close';
+    close.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    close.addEventListener('click', closePanel);
+    head.appendChild(close);
+    el.appendChild(head);
+
+    var list = document.createElement('ul');
+    list.className = 'news-panel__list';
+    var s = seen();
+    ANNOUNCEMENTS.forEach(function(a) {
+      var li = document.createElement('li');
+      li.className = 'news-item' + (s.indexOf(a.id) === -1 ? ' is-new' : '');
+      var top = document.createElement('div');
+      top.className = 'news-item__top';
+      top.appendChild(bi('span', 'news-item__tag', a.tag));
+      li.appendChild(top);
+      li.appendChild(bi('p', 'news-item__title', a.title));
+      li.appendChild(bi('p', 'news-item__text', a.text));
+      if (a.link) {
+        var link = bi('a', 'news-item__link', { fr: a.link.fr + (a.link.external ? ' ↗' : ' →'), en: (a.link.en || a.link.fr) + (a.link.external ? ' ↗' : ' →') });
+        link.href = a.link.href;
+        if (a.link.external) { link.target = '_blank'; link.rel = 'noopener'; }
+        link.addEventListener('click', function() { if (!a.link.external) closePanel(); });
+        li.appendChild(link);
+      }
+      list.appendChild(li);
+    });
+    el.appendChild(list);
+    return el;
+  }
+
+  function refreshBadge() {
+    var n = unreadCount();
+    button.classList.toggle('has-unread', n > 0);
+    var label = lang() === 'en' ? 'News' : 'Annonces';
+    if (n > 0) label += ' (' + n + (lang() === 'en' ? ' new)' : (n > 1 ? ' nouvelles)' : ' nouvelle)'));
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', lang() === 'en' ? 'News' : 'Annonces');
+    panel.setAttribute('aria-label', lang() === 'en' ? 'News' : 'Annonces');
+    panel.querySelector('.news-panel__close').setAttribute('aria-label', lang() === 'en' ? 'Close' : 'Fermer');
+  }
+
+  function openPanel() {
+    panel.classList.add('is-open');
+    panel.setAttribute('aria-hidden', 'false');
+    button.setAttribute('aria-expanded', 'true');
+    // Ouvrir le panneau vaut lecture : la pastille disparaît, les annonces
+    // restent marquées « nouvelles » jusqu'à la fermeture.
+    markAllSeen();
+    refreshBadge();
+    var first = panel.querySelector('.news-item__link') || panel.querySelector('.news-panel__close');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function closePanel() {
+    if (!panel.classList.contains('is-open')) return;
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+    button.setAttribute('aria-expanded', 'false');
+    panel.querySelectorAll('.news-item.is-new').forEach(function(li) { li.classList.remove('is-new'); });
+  }
+
+  function init() {
+    var actions = document.querySelector('.sys-bar__actions');
+    if (!actions || document.getElementById('news-panel') || !ANNOUNCEMENTS.length) return;
+
+    button = buildButton();
+    panel = buildPanel();
+    // Avant le bouton musique (ou le bouton thème s'il n'y a pas de musique)
+    actions.insertBefore(button, actions.querySelector('.music-btn') || document.getElementById('theme-toggle') || null);
+    document.body.appendChild(panel);
+
+    button.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (panel.classList.contains('is-open')) closePanel();
+      else {
+        // Un seul panneau ouvert à la fois : on ferme celui de la musique
+        var music = document.getElementById('music-panel');
+        if (music && music.classList.contains('is-open')) document.body.click();
+        openPanel();
+      }
+    });
+    document.addEventListener('click', function(e) {
+      if (!panel.classList.contains('is-open')) return;
+      if (panel.contains(e.target) || button.contains(e.target)) return;
+      closePanel();
+    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePanel(); });
+
+    refreshBadge();
+    new MutationObserver(refreshBadge).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

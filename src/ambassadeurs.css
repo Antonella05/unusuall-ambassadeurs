@@ -551,3 +551,123 @@
   .amb-promo.is-open::after, .amb-promo__tag::before,
   .amb-promo__feed.is-tick .amb-promo__label, .amb-promo__feed.is-tick .amb-promo__amount { animation: none; }
 }
+
+/* ============================================
+   Annonces : bouton mégaphone + panneau (fin de assets/js/app.js) — copie du site principal
+   Même allure que le panneau musique.
+   ============================================ */
+.news-btn { position: relative; }
+.news-btn__dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.news-btn.has-unread .news-btn__dot { opacity: 1; transform: none; animation: newsDotPulse 2.2s ease-out infinite; }
+.news-btn.has-unread svg { animation: newsRing 4s ease-in-out infinite; transform-origin: 30% 50%; }
+@keyframes newsDotPulse {
+  0% { box-shadow: 0 0 0 2px var(--surface), 0 0 0 2px rgba(233, 163, 25, .55); }
+  70%, 100% { box-shadow: 0 0 0 2px var(--surface), 0 0 0 8px rgba(233, 163, 25, 0); }
+}
+@keyframes newsRing {
+  0%, 82%, 100% { transform: none; }
+  86% { transform: rotate(-12deg); }
+  90% { transform: rotate(10deg); }
+  94% { transform: rotate(-6deg); }
+}
+
+.news-panel {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  z-index: 210;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100vh - 140px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--window-shadow);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity .2s ease, transform .2s ease, visibility 0s linear .2s;
+}
+.news-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.news-panel__head { display: flex; align-items: center; justify-content: space-between; }
+.news-panel__label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--pine);
+}
+.news-panel__close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.news-panel__close:hover { background: var(--bg); color: var(--text-primary); }
+.news-panel__close:focus-visible, .news-item__link:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+
+.news-panel__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
+.news-item {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+}
+.news-item.is-new { border-color: rgba(233, 163, 25, .55); background: linear-gradient(160deg, rgba(244, 192, 86, .12), transparent 60%), var(--bg); }
+.news-item.is-new::after {
+  content: "";
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.news-item__top { display: flex; align-items: center; gap: 8px; }
+.news-item__tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.news-item__title { margin: 0; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; color: var(--text-primary); }
+.news-item__text { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
+.news-item__link { justify-self: start; margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--pine); text-decoration: none; }
+.news-item__link:hover { text-decoration: underline; }
+
+@media (max-width: 767px) {
+  .news-panel { right: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-panel, .news-panel.is-open { transition: none; transform: none; }
+  .news-btn.has-unread .news-btn__dot, .news-btn.has-unread svg { animation: none; }
+}
