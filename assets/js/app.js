@@ -63,7 +63,8 @@
     targets.forEach(function (el) { io.observe(el); });
   }
 
-  /* Simulateur Epicure : 30 % du 1er mois + 10 % du 3e au 12e mois */
+  /* Simulateur Epicure : 1re année = 30 % du 1er mois + 10 % du 3e au 12e (2e mois offert) ;
+     années suivantes = 30 % du mois anniversaire + 10 % des 11 autres mois */
   var PLANS = { 's-standard': 27900, 's-premium': 45900, 's-ultra': 79900 };
   function simulate() {
     var sign = 0, month = 0;
@@ -75,6 +76,7 @@
     $('#r-sign').textContent = fmt(sign);
     $('#r-month').textContent = fmt(month);
     $('#r-year').textContent = fmt(sign + month * 10);
+    if ($('#r-next')) $('#r-next').textContent = fmt(sign + month * 11);
   }
   if ($('#r-sign')) {
     $$('.amb-stepper button').forEach(function (b) {

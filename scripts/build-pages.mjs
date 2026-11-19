@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '12';
+const V = '13';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -135,6 +135,7 @@ ${body}
             <a href="gains.html">Gains</a>
             <a href="avantages.html">Avantages</a>
             <a href="annuaire.html">Annuaire</a>
+            <a href="reglement.html">Règlement</a>
             <a href="postuler.html">Postuler</a>
           </div>
           <div class="app-footer__col">
@@ -190,7 +191,7 @@ const FEED = `
 PAGES.push({
   file: 'index.html',
   title: 'Devenez Ambassadeur UNUSUALL · Programme Ambassadeurs',
-  desc: "Parlez de nos produits autour de vous et gagnez de l'argent chaque mois. 30 % du premier mois, puis 10 % chaque mois pendant un an. Inscription gratuite.",
+  desc: "Parlez de nos produits autour de vous et gagnez de l'argent chaque mois. 30 % du premier mois, puis 10 % chaque mois, et 30 % à nouveau chaque année. Inscription gratuite.",
   windowTitle: 'Programme Ambassadeurs',
   body: `${SUBNAV([['index.html', 'Programme'], ['postuler.html', 'Postuler']], 'index.html')}
           <div class="amb-hero">
@@ -211,7 +212,7 @@ PAGES.push({
           <ul class="ep-stats" data-ep-stagger>
             <li><b><span class="ep-count" data-to="30">30</span> <small>%</small></b><span>du 1er mois pour vous</span></li>
             <li><b><span class="ep-count" data-to="10">10</span> <small>%</small></b><span>chaque mois ensuite</span></li>
-            <li><b><span class="ep-count" data-to="12">12</span></b><span>mois de revenus par client</span></li>
+            <li><b>∞</b><span>tant que le client paie, renouvelé chaque année</span></li>
             <li><b><span class="ep-count" data-to="0">0</span> <small>F</small></b><span>pour commencer</span></li>
           </ul>
 
@@ -255,7 +256,7 @@ PAGES.push({
               <div class="pg-pills"><span class="pg-pill pg-pill--live"><i></i>Ouvert maintenant</span></div>
               <h2>Epicure</h2>
               <p class="amb-feature__lead">Le logiciel qui aide les restaurants à ne plus perdre d'argent.</p>
-              ${CHECK(['Pour les restaurants, maquis, bars et fast-foods', 'Dès 27 900 FCFA par mois, sans engagement', '1 mois payé, 1 mois offert pour démarrer', 'Jusqu\'à 103 870 FCFA par an pour vous, par restaurant'])}
+              ${CHECK(['Pour les restaurants, maquis, bars et fast-foods', 'Dès 27 900 FCFA par mois, sans engagement', '1 mois payé, 1 mois offert pour démarrer', 'Jusqu\'à 103 870 FCFA pour vous la 1re année, puis 111 860 FCFA chaque année, par restaurant'])}
               <div class="pg-cta">
                 <a class="btn btn--primary" href="connexion.html?mode=inscription">Je représente Epicure →</a>
                 <a class="btn btn--ghost" href="https://unusuall.online/epicure.html" target="_blank" rel="noopener">Voir Epicure ↗</a>
@@ -284,18 +285,18 @@ const stepper = (id, label, val) => `
 PAGES.push({
   file: 'gains.html',
   title: 'Vos gains · Ambassadeurs UNUSUALL',
-  desc: "30 % du premier mois, puis 10 % chaque mois pendant un an. Jusqu'à 103 870 FCFA par an pour un seul restaurant. Calculez vos gains.",
+  desc: "30 % du premier mois, puis 10 % chaque mois, et 30 % à nouveau chaque année tant que le client paie. Jusqu'à 103 870 FCFA la 1re année pour un seul restaurant. Calculez vos gains.",
   windowTitle: 'Gains',
   back: { href: 'index.html', label: 'Programme' },
   body: `${SUBNAV([['gains.html', 'Gains'], ['avantages.html', 'Avantages']], 'gains.html')}
           <div class="ep-head amb-top" data-ep-reveal>
             <p class="pg-eyebrow">Vos gains</p>
-            <h1 class="pg-title">Un client signé, <span class="flame-text">12 mois de revenus.</span></h1>
+            <h1 class="pg-title">Un client signé, <span class="flame-text">des revenus chaque année.</span></h1>
           </div>
 
           <div class="amb-rule" data-ep-stagger>
-            <div><b>30 %</b><span>du 1er mois, dès la signature</span></div>
-            <div><b>10 %</b><span>chaque mois, du 3e au 12e</span></div>
+            <div><b>30 %</b><span>du 1er mois, puis à chaque anniversaire (13e, 25e mois…)</span></div>
+            <div><b>10 %</b><span>de tous les autres mois payés, sans limite de durée</span></div>
           </div>
 
           <div class="ep-section">
@@ -306,8 +307,9 @@ PAGES.push({
               </div>
               <div class="amb-sim__result" aria-live="polite">
                 <div><small>À la signature</small><b id="r-sign">107 130</b><span>FCFA</span></div>
-                <div><small>Chaque mois</small><b id="r-month">35 710</b><span>FCFA, pendant 10 mois</span></div>
-                <div class="amb-sim__total"><small>Total sur un an</small><b id="r-year">464 230</b><span>FCFA</span></div>
+                <div><small>Chaque mois</small><b id="r-month">35 710</b><span>FCFA, du 3e au 12e mois</span></div>
+                <div class="amb-sim__total"><small>Total la 1re année</small><b id="r-year">464 230</b><span>FCFA</span></div>
+                <div class="amb-sim__next"><small>Puis chaque année</small><b id="r-next">499 940</b><span>FCFA, tant qu'ils restent abonnés</span></div>
               </div>
             </div>
           </div>
@@ -316,12 +318,12 @@ PAGES.push({
             <div class="ep-head" data-ep-reveal><h2>Par restaurant Epicure</h2></div>
             <div class="amb-table" data-ep-reveal>
               <table>
-                <thead><tr><th scope="col">Formule</th><th scope="col">À la signature</th><th scope="col">Chaque mois</th><th scope="col">Sur un an</th></tr></thead>
+                <thead><tr><th scope="col">Formule</th><th scope="col">À la signature</th><th scope="col">Chaque mois</th><th scope="col">1re année</th><th scope="col">Années suivantes</th></tr></thead>
                 <tbody>
-${PLANS.map(([n, p], i) => `                  <tr${i === 1 ? ' class="is-hot"' : ''}><th scope="row">${n}</th><td>${f(p * 0.3)}</td><td>${f(p * 0.1)}</td><td><b>${f(p * 0.3 + p * 0.1 * 10)}</b></td></tr>`).join('\n')}
+${PLANS.map(([n, p], i) => `                  <tr${i === 1 ? ' class="is-hot"' : ''}><th scope="row">${n}</th><td>${f(p * 0.3)}</td><td>${f(p * 0.1)}</td><td><b>${f(p * 0.3 + p * 0.1 * 10)}</b></td><td><b>${f(p * 0.3 + p * 0.1 * 11)}</b></td></tr>`).join('\n')}
                 </tbody>
               </table>
-              <p>En FCFA. Le 2e mois est offert au client : pas de commission ce mois-là.</p>
+              <p>En FCFA, par an et par restaurant. Le 2e mois est offert au client à son inscription : pas de commission ce mois-là. Dès la 2e année, chaque mois payé rapporte (30 % le mois anniversaire, 10 % les autres). Détails dans le <a href="reglement.html">règlement</a>.</p>
             </div>
           </div>
 ${FINAL('Ces chiffres vous plaisent ?', 'Inscrivez-vous en deux minutes.', ['avantages.html', 'Voir les avantages'])}`
@@ -361,7 +363,7 @@ PAGES.push({
 
           <div class="ep-section">
             <div class="amb-charter" data-ep-reveal>
-              <div><h2>Nos 3 règles</h2><p>Vous faites la publicité comme vous voulez, avec ces règles simples.</p></div>
+              <div><h2>Nos 3 règles</h2><p>Vous faites la publicité comme vous voulez, avec ces règles simples. Tout le détail (paiements, durée, fin de partenariat) est dans le <a href="reglement.html">règlement du programme</a>.</p></div>
               ${CHECK(['Dire la vérité sur nos produits', 'Garder nos prix, sans fausses réductions', 'Pas de spam, pas de faux clients'])}
             </div>
           </div>
@@ -372,7 +374,8 @@ ${FINAL('Envie de nous rejoindre ?', 'Inscription gratuite, réponse sous 72 heu
 const FAQ = [
   ['Faut-il de l\x27expérience ?', 'Non. L\x27envie de convaincre suffit, on vous forme.'],
   ['Dois-je payer quelque chose ?', 'Non. Tout est gratuit : compte, formation et kit.'],
-  ['Comment suis-je payé ?', 'Chaque mois, par Mobile Money. Tout est visible dans votre espace.'],
+  ['Comment suis-je payé ?', 'Chaque mois, par Mobile Money, sans minimum et sans frais pour vous. Tout est visible dans votre espace.'],
+  ['Pendant combien de temps je touche des commissions ?', 'Tant que votre client reste abonné : 30 % de son 1er mois, puis 10 % de chaque mois payé, et de nouveau 30 % à chaque anniversaire (13e mois, 25e mois…).'],
   ['Comment savez-vous que le client vient de moi ?', 'Grâce à votre lien personnel et à votre QR code : chaque clic, inscription et paiement est compté automatiquement.'],
   ['Puis-je représenter plusieurs produits ?', 'Oui. Epicure est ouvert, les autres arrivent bientôt.'],
   ['Est-ce un emploi salarié ?', 'Non, vous êtes indépendant. Mais les meilleurs sont recrutés en priorité.']
@@ -413,6 +416,68 @@ PAGES.push({
 ${FAQ.map(([q, a]) => `              <details><summary>${q}</summary><p>${a}</p></details>`).join('\n')}
             </div>
           </div>`
+});
+
+/* 5 bis. Règlement du programme */
+const RULE = (n, ico, title, paras) => `
+            <div class="pg-legal__card">
+              <span class="pg-legal__n">${String(n).padStart(2, '0')}</span>
+              <div class="pg-legal__head"><span class="pg-ico"><svg viewBox="0 0 24 24" aria-hidden="true">${ico}</svg></span><h2>${title}</h2></div>
+${paras.map((p) => `              <p>${p}</p>`).join('\n')}
+            </div>`;
+PAGES.push({
+  file: 'reglement.html',
+  title: 'Règlement du programme · Ambassadeurs UNUSUALL',
+  desc: 'Règlement du programme Ambassadeurs UNUSUALL : conditions, attribution des clients, calcul et versement des commissions, règles de conduite et fin du partenariat.',
+  windowTitle: 'Règlement',
+  back: { href: 'index.html', label: 'Programme' },
+  body: `
+          <div class="ep-head amb-top" data-ep-reveal>
+            <p class="pg-eyebrow">En vigueur au 19 novembre 2026</p>
+            <h1 class="pg-title">Règlement du <span class="flame-text">programme</span></h1>
+            <p>Les règles qui s'appliquent à tous les Ambassadeurs UNUSUALL. En postulant, vous les acceptez.</p>
+          </div>
+
+          <article class="pg-legal">${RULE(1, '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 'Qui peut participer', [
+    "Le programme est ouvert à toute personne majeure (18 ans ou plus). L'inscription, la formation et le kit sont gratuits.",
+    "Vous devenez ambassadeur une fois votre candidature validée par UNUSUALL. UNUSUALL peut refuser une candidature."
+  ])}${RULE(2, '<path d="M20 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>', 'Votre statut', [
+    "Vous êtes indépendant : ce n'est ni un emploi salarié, ni un contrat d'agent. Vous organisez votre temps comme vous voulez.",
+    "Vous ne signez rien et n'encaissez jamais d'argent au nom d'UNUSUALL : le client paie toujours directement dans Epicure.",
+    'Vous déclarez vous-même vos revenus si la loi de votre pays le demande.'
+  ])}${RULE(3, '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>', 'Comment un client vous est attribué', [
+    "Un restaurant est à vous s'il s'inscrit sur Epicure avec votre lien personnel, votre QR code ou votre code ambassadeur.",
+    "Le premier ambassadeur enregistré garde le client. Un restaurant déjà inscrit sur Epicure avant votre contact ne peut pas vous être attribué."
+  ])}${RULE(4, '<path d="M4 20V4"/><path d="M4 16h16"/><path d="M8 16V8"/><path d="M12 16V11"/><path d="M16 16V6"/>', 'Calcul des commissions', [
+    "<strong>30 %</strong> du 1er mois payé par le client, puis <strong>10 %</strong> de chaque mois payé suivant.",
+    "Le 2e mois est offert au client à son inscription : il ne donne pas de commission.",
+    "Chaque année, le mois anniversaire (13e mois, 25e mois…) rapporte de nouveau <strong>30 %</strong>. Les commissions continuent tant que le client reste abonné.",
+    'La commission est calculée sur le montant réellement encaissé par UNUSUALL, après remise éventuelle.'
+  ])}${RULE(5, '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>', 'Validation et versement', [
+    "Une commission est validée 7 jours après le paiement du client. Les commissions validées sont arrêtées le 28 de chaque mois et versées le 5 du mois suivant.",
+    "Le versement se fait par Mobile Money, sur le numéro de votre compte. <strong>Il n'y a pas de minimum</strong> et <strong>les frais d'envoi sont payés par UNUSUALL</strong>.",
+    'Tout est visible dans votre espace : clients, paiements, commissions et versements.'
+  ])}${RULE(6, '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>', 'Remboursement et arrêt du client', [
+    "Si un client est remboursé, la commission correspondante est annulée. Si elle vous a déjà été versée, elle est déduite de vos prochains versements.",
+    "Si un client arrête de payer, les commissions s'arrêtent avec lui. Elles reprennent s'il se réabonne."
+  ])}${RULE(7, '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>', 'Ce qui est interdit', [
+    'Mentir sur nos produits, inventer des fonctionnalités ou annoncer de fausses réductions.',
+    "Envoyer du spam, créer de faux clients ou payer à la place d'un client pour toucher une commission.",
+    "Vous inscrire vous-même comme client : les inscriptions de votre propre restaurant sont vérifiées et peuvent ne pas donner droit à commission.",
+    "Vous présenter comme salarié d'UNUSUALL ou utiliser notre nom et nos logos en dehors du programme."
+  ])}${RULE(8, '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>', 'Fin du partenariat', [
+    'Vous pouvez quitter le programme à tout moment en écrivant à <a href="mailto:services@unusuall.online">services@unusuall.online</a>.',
+    "UNUSUALL peut suspendre ou retirer un ambassadeur qui ne respecte pas ce règlement. Son statut apparaît alors dans l'annuaire public.",
+    "Les commissions déjà gagnées vous restent acquises et sont versées normalement, <strong>sauf en cas de fraude</strong> : elles sont alors annulées. Après la fin du partenariat, aucune nouvelle commission n'est générée."
+  ])}${RULE(9, '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 'Vos données', [
+    "Vos informations (nom, contact, ville, réseau, motivation) servent à étudier votre candidature, suivre vos clients et vous payer. Elles ne sont ni vendues, ni partagées.",
+    "Vous n'apparaissez dans l'annuaire public que si vous l'acceptez. Pour consulter, corriger ou supprimer vos données, écrivez à services@unusuall.online."
+  ])}${RULE(10, '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>', 'Modifications', [
+    "UNUSUALL peut faire évoluer ce règlement. Vous serez prévenu par e-mail ou WhatsApp au moins 30 jours avant tout changement des commissions.",
+    "Un changement ne s'applique jamais aux commissions déjà gagnées."
+  ])}
+          </article>
+${FINAL('Ces règles vous conviennent ?', 'Inscription gratuite, réponse sous 72 heures.')}`
 });
 
 /* 6. Connexion */
@@ -514,7 +579,7 @@ PAGES.push({
             <div class="form-group span-2"><label for="f-motivation">Comment comptes-tu présenter Epicure à un restaurateur ? *</label><textarea id="f-motivation" name="motivation" class="form-control" rows="5" required minlength="80" maxlength="2000" placeholder="Décrivez concrètement votre approche : ce que vous direz au gérant, comment vous gérerez ses objections, comment vous le ferez essayer…"></textarea><p class="amb-hint">Une réponse détaillée (80 caractères minimum) montre que vous avez lu la formation.</p></div>
 
             <label class="amb-agree span-2"><input type="checkbox" name="annuaire" value="1" checked> J'accepte d'apparaître dans l'<a href="annuaire.html">annuaire public</a> des ambassadeurs certifiés (nom, ville, produits, photo).</label>
-            <label class="amb-agree span-2"><input type="checkbox" name="charte" value="acceptee" required> J'accepte la <a href="avantages.html">charte de l'ambassadeur</a> et le traitement de mes données pour étudier ma candidature. *</label>
+            <label class="amb-agree span-2"><input type="checkbox" name="charte" value="acceptee" required> J'accepte le <a href="reglement.html" target="_blank" rel="noopener">règlement du programme</a> et le traitement de mes données pour étudier ma candidature. *</label>
             <p class="form-error" id="apply-error" role="alert" hidden></p>
             <button class="btn btn--primary" type="submit">Envoyer ma candidature →</button>
           </form>`

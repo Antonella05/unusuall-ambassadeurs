@@ -50,6 +50,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(allowedKeys())
         && profileOk(request.resource.data)
         && request.resource.data.email == request.auth.token.email
+        // Adresse e-mail confirmée (lien reçu à l'inscription) : pas de candidature avec l'e-mail d'un autre.
+        && request.auth.token.email_verified == true
         && request.resource.data.charte == true
         && request.resource.data.status == 'pending'
         && request.resource.data.code == null

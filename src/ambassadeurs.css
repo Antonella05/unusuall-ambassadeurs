@@ -88,6 +88,7 @@
 .amb-sim__total { grid-column: 1 / -1; background: linear-gradient(160deg, #0f3321 0%, #134a2e 55%, #0b2a1a 100%) !important; }
 .amb-sim__total small, .amb-sim__total span { color: rgba(232, 245, 236, .75) !important; }
 .amb-sim__total b { font-size: clamp(32px, 5.4vh, 46px); color: var(--accent-light) !important; }
+.amb-sim__next { grid-column: 1 / -1; }
 
 /* Niveaux */
 .amb-levels { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }

@@ -147,13 +147,19 @@ async function findByCode(fs, code) {
   const docs = await fs.query('ambassadors', { where: and(eq('code', code), eq('status', 'approved')), limit: 1 });
   return docs.length ? { id: docId(docs[0].name), ...decFields(docs[0].fields) } : null;
 }
+/* Cycle renouvelé chaque année (maxMonths = durée du cycle, 12 par défaut) :
+   - 1er mois de chaque cycle (mois 1, 13, 25…) : firstPct (30 %)
+   - mois offert au client (mois 2, à l'inscription seulement) : 0
+   - tous les autres mois payés : recurringPct (10 %), sans limite de durée */
 function commissionFor(amount, moisIndex, settings) {
   const month = Number(moisIndex);
   if (!Number.isInteger(month) || month < 1) return { montant: 0, taux: 0, type: 'invalid' };
-  if (month === 1) return { montant: Math.round(amount * Number(settings.firstPct) / 100), taux: Number(settings.firstPct), type: 'first' };
+  const cycle = Math.max(1, Number(settings.maxMonths) || 12);
+  if ((month - 1) % cycle === 0) {
+    return { montant: Math.round(amount * Number(settings.firstPct) / 100), taux: Number(settings.firstPct), type: month === 1 ? 'first' : 'anniversary' };
+  }
   if (month === Number(settings.offeredMonth)) return { montant: 0, taux: 0, type: 'offered' };
-  if (month <= Number(settings.maxMonths)) return { montant: Math.round(amount * Number(settings.recurringPct) / 100), taux: Number(settings.recurringPct), type: 'recurring' };
-  return { montant: 0, taux: 0, type: 'expired' };
+  return { montant: Math.round(amount * Number(settings.recurringPct) / 100), taux: Number(settings.recurringPct), type: 'recurring' };
 }
 
 /* ───────── /go : lien personnel ───────── */

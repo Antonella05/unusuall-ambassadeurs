@@ -5,7 +5,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  sendPasswordResetEmail, signOut, updateProfile
+  sendPasswordResetEmail, signOut, updateProfile, sendEmailVerification
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, collection, collectionGroup, getDocs,
@@ -187,6 +187,8 @@ if (PAGE === 'login') {
       document.body.dataset.working = '1';
       const cred = await createUserWithEmailAndPassword(auth, mail, pass);
       await updateProfile(cred.user, { displayName: nom });
+      /* E-mail de confirmation : la candidature n'est possible qu'une fois l'adresse vérifiée. */
+      await sendEmailVerification(cred.user).catch((ex) => console.error('[vérification e-mail]', ex));
       location.replace('espace.html');
     } catch (ex) {
       console.error('[inscription]', ex);
@@ -226,7 +228,7 @@ if (PAGE === 'space') {
     $('#logout').addEventListener('click', () => signOut(auth).then(() => location.replace('connexion.html')));
     try {
       const snap = await getDoc(doc(db, 'ambassadors', user.uid));
-      if (!snap.exists()) return showApply(user);
+      if (!snap.exists()) return user.emailVerified ? showApply(user) : showVerify(user);
       const a = snap.data();
       if (a.status === 'approved') return showDashboard(user, a);
       root.innerHTML = statusCard(a);
@@ -253,6 +255,54 @@ if (PAGE === 'space') {
           <div><dt>WhatsApp</dt><dd>${esc(a.whatsapp)}</dd></div>
         </dl>
       </div>`;
+  }
+
+  /* Adresse e-mail pas encore confirmée : pas de candidature possible (règle Firestore). */
+  function showVerify(user) {
+    root.innerHTML = `
+      <div class="amb-status">
+        <span class="pg-pill pg-pill--beta"><i></i>Étape 1 sur 2</span>
+        <h2>Confirmez votre adresse e-mail.</h2>
+        <p>Nous avons envoyé un lien de confirmation à <b>${esc(user.email)}</b>. Ouvrez-le (pensez à regarder vos spams), puis revenez ici pour remplir votre candidature.</p>
+        <div class="pg-cta">
+          <button type="button" class="btn btn--primary" id="verify-done">J'ai confirmé mon adresse</button>
+          <button type="button" class="btn btn--ghost" id="verify-resend">Renvoyer l'e-mail</button>
+        </div>
+        <p class="form-error" id="verify-error" role="alert" hidden></p>
+        <p class="amb-info" id="verify-info" role="status" hidden></p>
+      </div>`;
+    const err = $('#verify-error'), info = $('#verify-info');
+    $('#verify-done').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      show(err, ''); show(info, '');
+      busy(btn, true, 'Vérification…');
+      try {
+        await user.reload();
+        if (!auth.currentUser.emailVerified) {
+          show(err, "Votre adresse n'est pas encore confirmée. Cliquez sur le lien reçu par e-mail, puis réessayez.");
+          return busy(btn, false);
+        }
+        await auth.currentUser.getIdToken(true);
+        showApply(auth.currentUser);
+      } catch (ex) {
+        console.error('[vérification e-mail]', ex);
+        show(err, errText(ex));
+        busy(btn, false);
+      }
+    });
+    $('#verify-resend').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      show(err, ''); show(info, '');
+      busy(btn, true, 'Envoi…');
+      try {
+        await sendEmailVerification(user);
+        show(info, 'E-mail renvoyé. Il peut mettre quelques minutes à arriver.');
+      } catch (ex) {
+        console.error('[vérification e-mail]', ex);
+        show(err, ex?.code === 'auth/too-many-requests' ? "Trop d'envois rapprochés. Patientez quelques minutes avant de redemander l'e-mail." : errText(ex));
+      }
+      busy(btn, false);
+    });
   }
 
   function showApply(user) {
@@ -430,7 +480,7 @@ if (PAGE === 'space') {
         <div class="pg-cta">
           <a class="btn btn--ghost" href="${esc(DEFAULT_SETTINGS.epicureUrl)}" target="_blank" rel="noopener">Page Epicure ↗</a>
           <a class="btn btn--ghost" href="gains.html">Rappel des gains</a>
-          <a class="btn btn--ghost" href="avantages.html">La charte</a>
+          <a class="btn btn--ghost" href="reglement.html">Le règlement</a>
         </div>
       </section>`;
 
@@ -735,9 +785,9 @@ if (PAGE === 'admin') {
   function renderSettings(pane) {
     const fields = [
       ['firstPct', 'Commission du 1er mois (%)', 0, 100],
-      ['recurringPct', 'Commission des mois suivants (%)', 0, 100],
-      ['offeredMonth', 'Mois offert au client (n°)', 1, 12],
-      ['maxMonths', 'Durée des commissions (mois)', 1, 36],
+      ['recurringPct', 'Commission des autres mois payés (%)', 0, 100],
+      ['offeredMonth', 'Mois offert au client à l’inscription (n°)', 1, 12],
+      ['maxMonths', 'Durée d’un cycle (mois) : le 1er mois de chaque cycle repaie le taux du 1er mois', 1, 36],
       ['validationDays', 'Délai de validation (jours)', 0, 60],
       ['closingDay', 'Jour de clôture du mois', 1, 28],
       ['paymentDay', 'Jour de versement', 1, 28]
