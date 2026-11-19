@@ -225,9 +225,9 @@ async function search(url, fs) {
     .map((d) => decFields(d.fields))
     /* Ceux qui ont refusé l'annuaire ne sortent que sur leur nom complet exact
        (le client qui les connaît peut toujours les retrouver) ou leur code. */
-    .filter((a) => a.code && (a.annuaire !== false
+    .filter((a) => a.code && (a.code === q.toUpperCase() || (a.annuaire !== false
       ? norm(a.nom).includes(q)
-      : fold(a.nom) === fq || a.code === q.toUpperCase()))
+      : fold(a.nom) === fq)))
     .slice(0, 10)
     .map((a) => ({ name: a.nom, code: a.code }));
   return json(out, 200, headers);
