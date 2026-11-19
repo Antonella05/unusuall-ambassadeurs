@@ -2,3 +2,4 @@ node_modules/
 .wrangler/
 functions/
 hs_err_pid*.log
+secrets/

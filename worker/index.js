@@ -1,6 +1,7 @@
 /* UNUSUALL Ambassadeurs — Worker Cloudflare (plan gratuit, sans Blaze).
    Routes : /go (redirection + clic), /qr (SVG), /search (recherche publique),
             /directory (annuaire public), /webhook (événements Epicure, secret),
+            dont restaurant.cancelled (résiliation),
             /admin (actions admin, jeton Firebase).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
@@ -465,6 +466,37 @@ async function handlePaymentCancelled(fs, body, reason) {
   return { ok: true };
 }
 
+/* Résiliation : le restaurant passe « résilié ». Un paiement confirmé plus tard
+   le repasse « abonné » et la numérotation des mois continue (moisIndex). */
+async function handleRestaurantCancelled(fs, body) {
+  const restaurantId = str(body.restaurantId);
+  if (!restaurantId) throw httpErr(400, 'invalid-argument', 'restaurantId est requis.');
+  const rid = safeId(restaurantId);
+  const index = await fs.data(`restaurantIndex/${rid}`);
+  if (!index) return { ignored: true, reason: 'unknown_restaurant' };
+  const when = body.date ? new Date(body.date) : new Date();
+  const cancelledAt = Number.isNaN(when.getTime()) ? new Date() : when;
+  const day = cancelledAt.toISOString().slice(0, 10);
+  const writes = [
+    {
+      update: {
+        name: docName(`events/${safeId(`restaurant-cancel:${restaurantId}:${day}`)}`),
+        fields: encFields({ type: 'restaurant.cancelled', restaurantId, ambassadorUid: index.ambassadorUid, processedAt: new Date() })
+      },
+      currentDocument: { exists: false }
+    },
+    {
+      update: {
+        name: docName(`ambassadors/${index.ambassadorUid}/restaurants/${rid}`),
+        fields: encFields({ restaurantId, statut: 'resilie', resilieAt: cancelledAt, updatedAt: new Date() })
+      },
+      updateMask: { fieldPaths: ['restaurantId', 'statut', 'resilieAt', 'updatedAt'] }
+    }
+  ];
+  try { await fs.commit(writes); } catch (e) { if (isDuplicate(e)) return { duplicate: true }; throw e; }
+  return { ok: true };
+}
+
 async function webhook(request, env, fs) {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   if (!secretOk(request, env)) return json({ error: 'unauthorized' }, 401);
@@ -477,6 +509,7 @@ async function webhook(request, env, fs) {
     case 'payment.confirmed': result = await handlePaymentConfirmed(fs, body); break;
     case 'payment.refunded': result = await handlePaymentCancelled(fs, body, 'rembourse'); break;
     case 'payment.failed': result = await handlePaymentCancelled(fs, body, 'impaye'); break;
+    case 'restaurant.cancelled': result = await handleRestaurantCancelled(fs, body); break;
     default: return json({ error: 'unknown_type' }, 400);
   }
   return json({ ok: true, ...result });
