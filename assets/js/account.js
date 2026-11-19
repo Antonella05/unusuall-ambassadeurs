@@ -530,7 +530,7 @@ if (PAGE === 'admin') {
         <div><dt>Ville · quartier</dt><dd>${esc(p.ville)}${p.quartier ? ' · ' + esc(p.quartier) : ''}</dd></div>
         <div><dt>Profession</dt><dd>${esc(p.profession || p.profil || '—')}</dd></div>
         <div><dt>Réseau</dt><dd>${esc((p.reseau || []).join(', ') || p.reseaux || '—')}</dd></div>
-        <div><dt>Profil</dt><dd>${p.profilLien ? `<a href="${esc(p.profilLien)}" target="_blank" rel="noopener">Voir le profil ↗</a>` : '—'}</dd></div>
+        <div><dt>Profil</dt><dd>${p.profilLien && isHttpUrl(p.profilLien) ? `<a href="${esc(p.profilLien)}" target="_blank" rel="noopener">Voir le profil ↗</a>` : (p.profilLien ? esc(p.profilLien) : '—')}</dd></div>
         <div><dt>Produits</dt><dd>${esc((p.produits || []).join(', '))}${p.produitsFuturs?.length ? ' · plus tard : ' + esc(p.produitsFuturs.join(', ')) : ''}</dd></div>
         <div><dt>Annuaire public</dt><dd>${p.annuaire === false ? 'Refusé' : 'Accepté'}</dd></div>
         <div class="is-wide"><dt>Motivation</dt><dd>${esc(p.motivation || p.methode || '—')}</dd></div>

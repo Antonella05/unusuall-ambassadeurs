@@ -15,11 +15,15 @@ service cloud.firestore {
     function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
 
     function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    // Liens affichés dans l'admin et l'annuaire : http(s) uniquement (jamais javascript:, data:…).
+    function isHttpUrl(v) { return v.matches('(?i)^https?://[^ ]+$'); }
     function profileOk(d) {
       return str(d.nom, 2, 100) && str(d.whatsapp, 6, 30) && str(d.ville, 2, 80)
         && str(d.quartier, 2, 80) && str(d.profession, 2, 100)
         && d.reseau is list && d.reseau.size() >= 1 && d.reseau.size() <= 6
-        && str(d.profilLien, 4, 300) && str(d.photo, 0, 300) && str(d.motivation, 80, 2000)
+        && str(d.profilLien, 4, 300) && isHttpUrl(d.profilLien)
+        && str(d.photo, 0, 300) && (d.photo == '' || isHttpUrl(d.photo))
+        && str(d.motivation, 80, 2000)
         && d.annuaire is bool
         && d.produits is list && d.produits.size() >= 1 && d.produits.size() <= 10
         && d.produitsFuturs is list && d.produitsFuturs.size() <= 10;

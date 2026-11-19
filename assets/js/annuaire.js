@@ -25,7 +25,7 @@ if (form && input && results) {
   const BADGE = { actif: 'ann-badge--actif', suspendu: 'ann-badge--suspendu', retire: 'ann-badge--retire' };
 
   const idle = () => {
-    results.innerHTML = `<div class="ann-idle"><span class="ann-idle__ico">${SEARCH_SVG}</span><p>Entrez un nom, un code ou un numéro pour vérifier si la personne est un ambassadeur certifié.</p></div>`;
+    results.innerHTML = `<div class="ann-idle"><span class="ann-idle__ico">${SEARCH_SVG}</span><p>Entrez un nom, un code ou un numéro complet pour vérifier si la personne est un ambassadeur certifié.</p></div>`;
   };
 
   const notFound = (q) => `<div class="ann-none">

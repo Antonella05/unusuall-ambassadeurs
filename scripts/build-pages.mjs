@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '11';
+const V = '12';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -562,7 +562,7 @@ PAGES.push({
           <div id="ann-results" class="ann-results" aria-live="polite">
             <div class="ann-idle">
               <span class="ann-idle__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
-              <p>Entrez un nom, un code ou un numéro pour vérifier si la personne est un ambassadeur certifié.</p>
+              <p>Entrez un nom, un code ou un numéro complet pour vérifier si la personne est un ambassadeur certifié.</p>
             </div>
           </div>
 

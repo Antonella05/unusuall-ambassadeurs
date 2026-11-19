@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const norm = (v) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const digits = (v) => String(v || '').replace(/\D/g, '');
+const fold = (v) => String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const safeId = (v) => {
   const s = encodeURIComponent(String(v));
   return s === '.' || s === '..' ? `_${s}` : s;
@@ -109,7 +110,9 @@ class Firestore {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined
     });
-    if (res.status === 404) return null;
+    /* 404 = « document absent » seulement pour une lecture. Sur une écriture
+       (commit, précondition exists:true), c'est un échec : on le remonte. */
+    if (res.status === 404 && method === 'GET') return null;
     const data = await res.json();
     if (!res.ok) {
       const err = (Array.isArray(data) ? data.find((r) => r.error)?.error : data.error) || {};
@@ -217,22 +220,29 @@ async function search(url, fs) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300' };
   if (q.length < 2) return json([], 200, headers);
   const docs = await fs.query('ambassadors', { where: eq('status', 'approved'), limit: 200 });
+  const fq = fold(q);
   const out = docs
     .map((d) => decFields(d.fields))
-    .filter((a) => a.code && norm(a.nom).includes(q))
+    /* Ceux qui ont refusé l'annuaire ne sortent que sur leur nom complet exact
+       (le client qui les connaît peut toujours les retrouver) ou leur code. */
+    .filter((a) => a.code && (a.annuaire !== false
+      ? norm(a.nom).includes(q)
+      : fold(a.nom) === fq || a.code === q.toUpperCase()))
     .slice(0, 10)
     .map((a) => ({ name: a.nom, code: a.code }));
   return json(out, 200, headers);
 }
 
 /* ───────── /directory : annuaire public (nom, code ou téléphone) ───────── */
-const fold = (v) => String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
 async function directory(url, fs) {
   const raw = str(url.searchParams.get('q'));
   const headers = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=120' };
   const q = fold(raw);
   const qd = digits(raw);
-  if (q.length < 2 && qd.length < 3) return json([], 200, headers);
+  /* Téléphone : numéro complet uniquement (8 chiffres ou plus), pour qu'on ne
+     puisse pas parcourir l'annuaire avec un indicatif ou quelques chiffres. */
+  const phoneQuery = qd.length >= 8 && qd.length >= raw.replace(/[\s+().-]/g, '').length;
+  if (q.length < 2 && !phoneQuery) return json([], 200, headers);
   const statuses = ['approved', 'suspended', 'removed'];
   const statusOf = { approved: 'actif', suspended: 'suspendu', removed: 'retire' };
   const docs = (await Promise.all(statuses.map((s) => fs.query('ambassadors', { where: eq('status', s), limit: 300 })))).flat();
@@ -241,7 +251,11 @@ async function directory(url, fs) {
     .filter((a) => a.code && a.annuaire !== false)
     .filter((a) => {
       if (q.length >= 2 && (fold(a.nom).includes(q) || fold(a.code).includes(q))) return true;
-      if (qd.length >= 3 && digits(a.whatsapp).includes(qd)) return true;
+      if (phoneQuery) {
+        const w = digits(a.whatsapp);
+        /* Même numéro, avec ou sans indicatif pays (229…). */
+        if (w.length >= 8 && (w === qd || w.endsWith(qd) || qd.endsWith(w))) return true;
+      }
       return false;
     })
     .slice(0, 20)
@@ -400,10 +414,11 @@ async function handlePaymentConfirmed(fs, body) {
     {
       update: {
         name: docName(`ambassadors/${uid}/restaurants/${rid}`),
-        fields: encFields({ statut: 'abonne', ...(str(body.formule) ? { formule: str(body.formule).slice(0, 40) } : {}), updatedAt: new Date() })
+        fields: encFields({ restaurantId, statut: 'abonne', ...(str(body.formule) ? { formule: str(body.formule).slice(0, 40) } : {}), updatedAt: new Date() })
       },
-      updateMask: { fieldPaths: ['statut', 'updatedAt', ...(str(body.formule) ? ['formule'] : [])] },
-      currentDocument: { exists: true }
+      /* Sans précondition : si la fiche a disparu, elle est recréée au lieu de
+         faire échouer tout l'enregistrement du paiement. */
+      updateMask: { fieldPaths: ['restaurantId', 'statut', 'updatedAt', ...(str(body.formule) ? ['formule'] : [])] }
     },
     {
       update: {
