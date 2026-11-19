@@ -415,3 +415,139 @@
   .ann-search .btn { width: 100%; justify-content: center; }
   .ann-search__field input { font-size: 16px; min-height: 48px; }
 }
+
+/* ============================================
+   Notification « Site officiel » (fin de assets/js/app.js) — copie du site principal
+   Carte sombre aux couleurs de la marque, en bas à droite ;
+   au-dessus de la barre de navigation sur mobile.
+   ============================================ */
+.amb-promo {
+  --amb-promo-bottom: 20px;
+  position: fixed;
+  right: 20px;
+  bottom: var(--amb-promo-bottom);
+  z-index: 205;
+  width: min(360px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-radius: 20px;
+  color: #E8F5EC;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(244, 192, 86, .22), transparent 55%),
+    linear-gradient(160deg, #0F3321 0%, #134A2E 55%, #0B2A1A 100%);
+  border: 1px solid rgba(244, 192, 86, .35);
+  box-shadow: 0 24px 60px rgba(8, 28, 21, .35), 0 0 0 1px rgba(255, 255, 255, .04) inset;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(24px) scale(.97);
+  transition: opacity .35s ease, transform .5s cubic-bezier(.16, 1, .3, 1), visibility 0s linear .5s;
+}
+.amb-promo.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity .35s ease, transform .5s cubic-bezier(.16, 1, .3, 1), visibility 0s;
+}
+/* Reflet doré qui traverse la carte à l'ouverture */
+.amb-promo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(244, 192, 86, .18) 50%, transparent 65%);
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+.amb-promo.is-open::after { animation: ambPromoShine 1.6s .4s ease-out; }
+@keyframes ambPromoShine { to { transform: translateX(100%); } }
+
+.amb-promo__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.amb-promo__tag {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #F4C056;
+}
+.amb-promo__tag::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #F4C056;
+  box-shadow: 0 0 0 0 rgba(244, 192, 86, .6);
+  animation: ambPromoPulse 2s ease-out infinite;
+}
+@keyframes ambPromoPulse {
+  70% { box-shadow: 0 0 0 7px rgba(244, 192, 86, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 192, 86, 0); }
+}
+.amb-promo__close {
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, .08);
+  color: rgba(232, 245, 236, .8);
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.amb-promo__close:hover, .amb-promo__close:focus-visible { background: rgba(255, 255, 255, .16); color: #fff; }
+
+.amb-promo__title { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.25; letter-spacing: -.02em; color: #fff; }
+.amb-promo__text { margin: 0; font-size: 13px; line-height: 1.55; color: rgba(232, 245, 236, .78); }
+
+.amb-promo__feed {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .07);
+  border: 0.5px solid rgba(255, 255, 255, .1);
+  font-size: 12.5px;
+}
+.amb-promo__dot { width: 8px; height: 8px; border-radius: 50%; background: #52B788; flex: none; }
+.amb-promo__label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(232, 245, 236, .85); }
+.amb-promo__amount { font-variant-numeric: tabular-nums; font-weight: 800; color: #F4C056; }
+.amb-promo__feed.is-tick .amb-promo__label,
+.amb-promo__feed.is-tick .amb-promo__amount { animation: ambPromoTick .45s cubic-bezier(.16, 1, .3, 1); }
+@keyframes ambPromoTick { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.amb-promo__actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.amb-promo__cta {
+  flex: 1;
+  justify-content: center;
+  background: linear-gradient(135deg, #F4C056, #E9A319);
+  color: #0B2A1A;
+  font-weight: 700;
+  border: 0;
+}
+.amb-promo__cta:hover, .amb-promo__cta:focus-visible { filter: brightness(1.06); color: #0B2A1A; }
+.amb-promo__later {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(232, 245, 236, .75);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.amb-promo__later:hover, .amb-promo__later:focus-visible { color: #fff; background: rgba(255, 255, 255, .06); }
+
+@media (max-width: 767px) {
+  .amb-promo { right: 12px; left: 12px; width: auto; }
+  .amb-promo__title { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amb-promo, .amb-promo.is-open { transition: opacity .2s ease, visibility 0s; transform: none; }
+  .amb-promo.is-open::after, .amb-promo__tag::before,
+  .amb-promo__feed.is-tick .amb-promo__label, .amb-promo__feed.is-tick .amb-promo__amount { animation: none; }
+}

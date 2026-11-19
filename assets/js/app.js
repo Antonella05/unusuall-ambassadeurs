@@ -610,3 +610,197 @@
     init();
   }
 })();
+
+/* ============================================
+   UNUSUALL — Notification « Site officiel » (plateforme ambassadeurs)
+   Pendant de la notification « Programme Ambassadeurs » de unusuall.online
+   (même composant, mêmes règles) : présente le site principal et ses
+   logiciels, et y renvoie (nouvel onglet).
+   - Apparaît après DELAY_MS sur le site, ou dès 35 % de défilement,
+     jamais pendant l'intro.
+   - Revient toutes les INTERVAL_MIN minutes : après une apparition ou une
+     fermeture (« Plus tard », ✕, Échap), même si le visiteur reste sur le site
+     ou recharge la page.
+   - Clic sur « Visiter unusuall.online » : plus rien pendant CLICKED_DAYS jours.
+   - Absente des pages de compte (connexion, espace, admin) et de la page 404.
+   - Vit hors de .app-main : elle reste en place quand on change de page.
+   ============================================ */
+
+(function() {
+  'use strict';
+
+  var URL = 'https://unusuall.online/';
+  var DELAY_MS = 7000;
+  var INTERVAL_MIN = 15;
+  var CLICKED_DAYS = 60;
+  var INTERVAL_MS = INTERVAL_MIN * 60000;
+  var KEY = 'unusuall-site-promo';          // localStorage : date jusqu'à laquelle on n'affiche plus
+  var SKIP_PAGES = /(connexion|espace|admin|404)(\.html)?$/i;
+
+  // Les logiciels UNUSUALL qui défilent dans la carte
+  var FEED = [
+    { fr: 'Epicure · Restaurants', en: 'Epicure · Restaurants', amount: 'Disponible' },
+    { fr: 'Suite SOFIA · Santé', en: 'Suite SOFIA · Healthcare', amount: 'Bientôt' },
+    { fr: 'OMI · Données mobiles', en: 'OMI · Mobile data', amount: 'Bêta' },
+    { fr: 'Studio · Sur mesure', en: 'Studio · Custom', amount: 'Ouvert' }
+  ];
+
+  var card, feedIndex = 0, feedTimer = null, showTimer = null, shown = false;
+
+  function store(get, value) {
+    try {
+      if (get) return localStorage.getItem(KEY);
+      localStorage.setItem(KEY, value);
+    } catch (e) { return null; }
+  }
+  // Temps restant (ms) avant de pouvoir réafficher la carte ; 0 si elle peut s'afficher
+  function remaining() {
+    var until = Number(store(true));
+    return until && until > Date.now() ? until - Date.now() : 0;
+  }
+  function snooze(ms) {
+    // Ne raccourcit jamais une pause plus longue (60 jours après un clic)
+    if (remaining() > ms) return;
+    store(false, String(Date.now() + ms));
+  }
+  // Prochaine apparition, si elle tombe dans l'intervalle (pas après un clic)
+  function scheduleNext(ms) {
+    clearTimeout(showTimer);
+    if (ms <= INTERVAL_MS) showTimer = setTimeout(show, ms + 500);
+  }
+
+  function lang() { return document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'fr'; }
+
+  // Élément bilingue : i18n.js le retraduit tout seul au changement de langue
+  function el(tag, cls, fr, en) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (fr != null) {
+      node.setAttribute('data-fr', fr);
+      node.setAttribute('data-en', en);
+      node.textContent = lang() === 'en' ? en : fr;
+    }
+    return node;
+  }
+
+  function build() {
+    card = document.createElement('aside');
+    card.className = 'amb-promo';
+    card.setAttribute('aria-label', 'Le site officiel UNUSUALL');
+    card.setAttribute('data-no-brand', '');
+
+    var head = document.createElement('div');
+    head.className = 'amb-promo__head';
+    var tag = el('p', 'amb-promo__tag', 'UNUSUALL · Le site officiel', 'UNUSUALL · Official website');
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'amb-promo__close';
+    close.setAttribute('aria-label', lang() === 'en' ? 'Close' : 'Fermer');
+    close.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    head.appendChild(tag);
+    head.appendChild(close);
+
+    var title = el('p', 'amb-promo__title', 'Découvrez ce que vous allez représenter.', 'Discover what you will represent.');
+    var text = el('p', 'amb-promo__text',
+      'Epicure, les suites et le Studio : fonctionnalités, tarifs et démonstrations sur unusuall.online. Le meilleur moyen de bien les présenter.',
+      'Epicure, the suites and the Studio: features, pricing and demos on unusuall.online. The best way to present them well.');
+
+    var feed = document.createElement('div');
+    feed.className = 'amb-promo__feed';
+    feed.setAttribute('aria-hidden', 'true');
+    feed.innerHTML = '<span class="amb-promo__dot"></span><span class="amb-promo__label"></span><b class="amb-promo__amount"></b>';
+
+    var actions = document.createElement('div');
+    actions.className = 'amb-promo__actions';
+    var cta = el('a', 'btn amb-promo__cta', 'Visiter unusuall.online ↗', 'Visit unusuall.online ↗');
+    cta.href = URL;
+    cta.target = '_blank';
+    cta.rel = 'noopener';
+    var later = el('button', 'amb-promo__later', 'Plus tard', 'Later');
+    later.type = 'button';
+    actions.appendChild(cta);
+    actions.appendChild(later);
+
+    card.appendChild(head);
+    card.appendChild(title);
+    card.appendChild(text);
+    card.appendChild(feed);
+    card.appendChild(actions);
+    document.body.appendChild(card);
+
+    close.addEventListener('click', function() { hide(INTERVAL_MS); });
+    later.addEventListener('click', function() { hide(INTERVAL_MS); });
+    cta.addEventListener('click', function() { hide(CLICKED_DAYS * 86400000); });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && shown) hide(INTERVAL_MS);
+    });
+  }
+
+  function renderFeed() {
+    var item = FEED[feedIndex % FEED.length];
+    var feed = card.querySelector('.amb-promo__feed');
+    feed.classList.remove('is-tick');
+    void feed.offsetWidth;
+    card.querySelector('.amb-promo__label').textContent = lang() === 'en' ? item.en : item.fr;
+    card.querySelector('.amb-promo__amount').textContent = item.amount;
+    feed.classList.add('is-tick');
+    feedIndex++;
+  }
+
+  // Sur mobile, la carte se place juste au-dessus de la barre de navigation du bas
+  function placeAboveDock() {
+    var dock = document.querySelector('.mobile-dock');
+    var h = dock && getComputedStyle(dock).display !== 'none' ? dock.offsetHeight : 0;
+    card.style.setProperty('--amb-promo-bottom', (h + 12) + 'px');
+  }
+
+  function show() {
+    if (shown) return;
+    var wait = remaining();
+    if (wait) { scheduleNext(wait); return; }
+    if (document.getElementById('page-loader')) { showTimer = setTimeout(show, 800); return; }
+    shown = true;
+    // Un rechargement dans les 15 minutes ne la refait pas apparaître
+    snooze(INTERVAL_MS);
+    if (!card) build();
+    placeAboveDock();
+    renderFeed();
+    requestAnimationFrame(function() { card.classList.add('is-open'); });
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      feedTimer = setInterval(renderFeed, 2600);
+    }
+  }
+
+  function hide(ms) {
+    if (!shown) return;
+    shown = false;
+    snooze(ms);
+    clearInterval(feedTimer);
+    card.classList.remove('is-open');
+    scheduleNext(ms);
+  }
+
+  function onScroll() {
+    var main = document.querySelector('.app-main');
+    var scroller = main && main.scrollHeight > main.clientHeight + 4 ? main : document.documentElement;
+    var max = scroller.scrollHeight - scroller.clientHeight;
+    if (max > 0 && scroller.scrollTop / max > 0.35) {
+      window.removeEventListener('scroll', onScroll, true);
+      show();
+    }
+  }
+
+  function init() {
+    if (SKIP_PAGES.test(location.pathname)) return;
+    var wait = remaining();
+    if (wait) { scheduleNext(wait); return; }
+    // Les robots et les aperçus de liens n'ont pas besoin de la notification
+    if (/bot|crawl|spider|slurp|lighthouse|headless|preview/i.test(navigator.userAgent || '')) return;
+    showTimer = setTimeout(show, DELAY_MS);
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    window.addEventListener('resize', function() { if (card) placeAboveDock(); });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
