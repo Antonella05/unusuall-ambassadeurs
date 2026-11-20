@@ -279,7 +279,8 @@
 .amb-qr__close { margin-top: 16px; }
 
 /* ───────── Administration : onglets principaux, suivi, récap, réglages ───────── */
-.amb-main-tabs { max-width: 720px; }
+.amb-main-tabs { max-width: 860px; overflow-x: auto; scrollbar-width: none; }
+.amb-main-tabs button { white-space: nowrap; }
 .amb-copy { padding: 6px 10px; border-radius: 8px; border: 0.5px solid var(--border); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-primary); background: var(--bg); cursor: pointer; white-space: nowrap; }
 .amb-copy:hover { background: var(--surface); }
 .amb-copy:disabled { opacity: .5; cursor: default; }
@@ -670,6 +671,33 @@
 @media (prefers-reduced-motion: reduce) {
   .news-panel, .news-panel.is-open { transition: none; transform: none; }
   .news-btn.has-unread .news-btn__dot, .news-btn.has-unread svg { animation: none; }
+}
+
+/* Administration : vue d'ensemble, répartition par ville, recherche */
+.amb-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 14px 18px; border-radius: 16px; background: rgba(233, 163, 25, .12); border: 1px solid rgba(233, 163, 25, .45); }
+.amb-alert p { margin: 0; font-size: 14.5px; color: var(--text-primary); }
+.amb-alert.is-late { background: rgba(179, 38, 30, .08); border-color: rgba(179, 38, 30, .35); }
+.amb-overview { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.amb-h2 { margin: 26px 0 8px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; color: var(--text-primary); }
+.amb-h2 + .amb-hint { margin-bottom: 10px; }
+.amb-bar-col { width: 34%; }
+.amb-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface); }
+.amb-bar i { display: block; height: 100%; background: var(--pine-bright); }
+.amb-bar i.is-pending { background: var(--accent-light); }
+.amb-linkbtn { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--pine); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+[data-theme="dark"] .amb-linkbtn { color: var(--pine-bright); }
+.amb-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.amb-toolbar .form-control { width: auto; min-width: 150px; flex: 0 1 auto; }
+.amb-toolbar .amb-toolbar__search { flex: 1 1 260px; min-width: 220px; }
+.amb-toolbar select.form-control { padding-right: 36px !important; min-width: 175px; }
+.amb-toolbar .amb-linkbtn { font-size: 14px; }
+#cand-count:empty { display: none; }
+#cand-count { margin-bottom: 10px; }
+@media (max-width: 560px) {
+  .amb-toolbar .form-control, .amb-toolbar .btn { flex: 1 1 100%; }
+  .amb-overview { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .amb-main-tabs button { flex: 0 0 auto; }
+  .amb-bar-col { width: 28%; }
 }
 
 /* Pied de page : les 6 liens « Programme » sur deux colonnes de 3 */

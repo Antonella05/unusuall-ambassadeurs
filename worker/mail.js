@@ -1,7 +1,8 @@
 /* UNUSUALL Ambassadeurs — e-mails envoyés aux candidats, tous sur la même mise en page.
    verifyEmail   : confirmation de l'adresse e-mail (à la création du compte) ;
    passwordReset : choix d'un nouveau mot de passe ;
-   applicationAck : accusé de réception de candidature. */
+   applicationAck : accusé de réception de candidature ;
+   decisionApproved / decisionRejected : réponse à la candidature. */
 
 const SITE = 'https://ambassadeurs.unusuall.online';
 const LOGO = `${SITE}/assets/img/icon-192-mark.png`;
@@ -22,7 +23,7 @@ const fallbackLink = (href) => `
           <a href="${esc(href)}" style="color:#1a472a;word-break:break-all;">${esc(href)}</a></p>`;
 
 /* Cadre commun : logo, carte blanche, pied de page. */
-function layout({ subject, preheader, pill, title, body }) {
+function layout({ subject, preheader, pill, title, body, signoff = 'À très vite,' }) {
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -48,7 +49,7 @@ function layout({ subject, preheader, pill, title, body }) {
         <p style="margin:0 0 14px;display:inline-block;padding:6px 12px;border-radius:999px;background:#fef3dc;color:#8a5a00;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${esc(pill)}</p>
         <h1 style="margin:6px 0 18px;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-0.5px;color:#0d2818;">${title}</h1>
 ${body}
-        <p style="margin:26px 0 0;font-size:16px;line-height:1.6;">À très vite,<br><b>L'équipe UNUSUALL</b></p>
+        <p style="margin:26px 0 0;font-size:16px;line-height:1.6;">${esc(signoff)}<br><b>L'équipe UNUSUALL</b></p>
       </td></tr>
 
       <tr><td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:#5a7260;text-align:center;">
@@ -140,6 +141,82 @@ export function applicationAck({ nom, ville } = {}) {
     SITE, '',
     `Partager sur WhatsApp : ${whatsapp}`,
     ...SIGNATURE
+  ].join('\n');
+  return { subject, html, text };
+}
+
+export function decisionApproved({ nom, code, link, firstPct = 30, recurringPct = 10, paymentDay = 5 }) {
+  const hello = helloFor(nom);
+  const subject = 'Bienvenue parmi les Ambassadeurs UNUSUALL !';
+  const step = (n, t) => `
+          <tr>
+            <td style="width:34px;vertical-align:top;padding:0 0 12px;"><span style="display:inline-block;width:26px;height:26px;line-height:26px;border-radius:50%;background:#1a472a;color:#ffffff;font-size:13px;font-weight:700;text-align:center;">${n}</span></td>
+            <td style="vertical-align:top;padding:2px 0 12px;font-size:15px;line-height:1.55;color:#0d2818;">${t}</td>
+          </tr>`;
+  const html = layout({
+    subject,
+    preheader: `Votre candidature est validée. Votre code ambassadeur : ${code}.`,
+    pill: 'Candidature validée',
+    title: 'Bienvenue parmi les ambassadeurs&nbsp;!',
+    body: `
+        <p style="${P}">${esc(hello)}</p>
+        <p style="${P}">Bonne nouvelle&nbsp;: votre candidature est validée. Vous êtes officiellement <b>Ambassadeur UNUSUALL</b>.</p>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 22px;background:#eaf5ee;border-radius:16px;">
+          <tr><td style="padding:22px;">
+            <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3d5a47;">Votre code ambassadeur</p>
+            <p style="margin:0 0 14px;font-size:28px;font-weight:800;letter-spacing:3px;color:#1a472a;font-family:Consolas,Menlo,monospace;">${esc(code)}</p>
+            <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3d5a47;">Votre lien personnel</p>
+            <p style="margin:0;font-size:14px;word-break:break-all;"><a href="${esc(link)}" style="color:#1a472a;font-weight:600;">${esc(link)}</a></p>
+          </td></tr>
+        </table>
+
+        <p style="margin:0 0 12px;font-size:17px;font-weight:800;color:#0d2818;">Comment ça marche</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+${step(1, 'Partagez votre lien ou votre QR code aux restaurants autour de vous.')}
+${step(2, 'Le restaurant s\'inscrit sur Epicure avec votre lien&nbsp;: il vous est attribué automatiquement.')}
+${step(3, `Vous touchez <b>${firstPct}&nbsp;%</b> de son 1er mois payé, puis <b>${recurringPct}&nbsp;%</b> de chaque mois suivant, versés le ${paymentDay} de chaque mois sur Mobile Money.`)}
+        </table>
+${button(`${SITE}/espace.html`, 'Ouvrir mon espace')}
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#5a7260;">Votre QR code, vos restaurants et vos gains sont dans votre espace. Avant de commencer, prenez deux minutes pour relire <a href="${SITE}/reglement.html" style="color:#1a472a;font-weight:600;">les règles du programme</a>.</p>`
+  });
+  const text = [
+    hello, '',
+    'Bonne nouvelle : votre candidature est validée. Vous êtes officiellement Ambassadeur UNUSUALL.', '',
+    `Votre code ambassadeur : ${code}`,
+    `Votre lien personnel : ${link}`, '',
+    'Comment ça marche :',
+    '1. Partagez votre lien ou votre QR code aux restaurants autour de vous.',
+    "2. Le restaurant s'inscrit sur Epicure avec votre lien : il vous est attribué automatiquement.",
+    `3. Vous touchez ${firstPct} % de son 1er mois payé, puis ${recurringPct} % de chaque mois suivant, versés le ${paymentDay} de chaque mois sur Mobile Money.`, '',
+    `Votre espace (QR code, restaurants, gains) : ${SITE}/espace.html`,
+    `Les règles du programme : ${SITE}/reglement.html`,
+    ...SIGNATURE
+  ].join('\n');
+  return { subject, html, text };
+}
+
+export function decisionRejected({ nom }) {
+  const hello = helloFor(nom);
+  const subject = 'Votre candidature Ambassadeur UNUSUALL';
+  const html = layout({
+    subject,
+    preheader: 'Merci pour votre candidature au programme Ambassadeurs UNUSUALL.',
+    pill: 'Votre candidature',
+    title: 'Merci pour votre candidature',
+    signoff: 'Bien cordialement,',
+    body: `
+        <p style="${P}">${esc(hello)}</p>
+        <p style="${P}">Merci de l'intérêt que vous portez au programme <b>Ambassadeurs UNUSUALL</b> et du temps que vous avez pris pour postuler.</p>
+        <p style="${P}">Après étude, nous ne pouvons pas donner suite à votre candidature pour le moment. Cette décision ne remet pas en cause vos qualités&nbsp;: nous avons dû faire des choix selon les besoins actuels du programme.</p>
+        <p style="margin:0;font-size:16px;line-height:1.6;">Si vous avez une question, répondez simplement à cet e-mail.</p>`
+  });
+  const text = [
+    hello, '',
+    "Merci de l'intérêt que vous portez au programme Ambassadeurs UNUSUALL et du temps que vous avez pris pour postuler.", '',
+    'Après étude, nous ne pouvons pas donner suite à votre candidature pour le moment. Cette décision ne remet pas en cause vos qualités : nous avons dû faire des choix selon les besoins actuels du programme.', '',
+    'Si vous avez une question, répondez simplement à cet e-mail.', '',
+    'Bien cordialement,', "L'équipe UNUSUALL"
   ].join('\n');
   return { subject, html, text };
 }

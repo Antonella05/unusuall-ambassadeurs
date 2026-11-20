@@ -10,7 +10,7 @@
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
-import { applicationAck, verifyEmail, passwordReset, sendMail } from './mail.js';
+import { applicationAck, verifyEmail, passwordReset, decisionApproved, decisionRejected, sendMail } from './mail.js';
 
 const PROJECT = 'unusuall-ambassadeurs';
 const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
@@ -696,6 +696,42 @@ async function correctAttribution(fs, body) {
   return { ok: true, moved: payments.length + commissions.length };
 }
 
+/* E-mail de décision (validée / refusée), une seule fois par statut et par compte. */
+async function notifyDecision(fs, env, body, origin) {
+  const uid = str(body.ambassadorUid);
+  if (!uid) throw httpErr(400, 'invalid-argument', 'ambassadorUid est requis.');
+  const a = await fs.data(`ambassadors/${uid}`);
+  if (!a) throw httpErr(404, 'not-found', 'Ambassadeur introuvable.');
+  if (!str(a.email)) throw httpErr(400, 'invalid-argument', "Pas d'adresse e-mail sur cette fiche.");
+  let mail;
+  if (a.status === 'approved' && a.code) {
+    const s = await getSettings(fs);
+    mail = decisionApproved({
+      nom: a.nom, code: a.code, link: `${origin}/go?a=${encodeURIComponent(a.code)}`,
+      firstPct: s.firstPct, recurringPct: s.recurringPct, paymentDay: s.paymentDay
+    });
+  } else if (a.status === 'rejected') {
+    mail = decisionRejected({ nom: a.nom });
+  } else {
+    return { ok: true, skipped: true };
+  }
+  const log = docName(`decisionLog/${uid}_${a.status}`);
+  try {
+    await fs.commit([{ update: { name: log, fields: encFields({ sentAt: new Date(), to: a.email, status: a.status }) }, currentDocument: { exists: false } }]);
+  } catch (e) {
+    if (isDuplicate(e)) return { ok: true, already: true };
+    throw e;
+  }
+  try {
+    await sendMail(env, { to: a.email, ...mail });
+  } catch (e) {
+    console.error('[notifyDecision]', e.message);
+    await fs.commit([{ delete: log }]).catch(() => {});
+    throw httpErr(502, 'unavailable', "L'e-mail n'a pas pu être envoyé.");
+  }
+  return { ok: true, sent: true };
+}
+
 async function admin(request, env, fs) {
   const origin = request.headers.get('Origin') || '';
   const cors = ALLOWED_ORIGINS.includes(origin)
@@ -710,6 +746,7 @@ async function admin(request, env, fs) {
   try { body = await request.json(); } catch { throw httpErr(400, 'invalid-argument', 'Corps JSON invalide.'); }
   if (body.action === 'markPaid') return json(await markPaid(fs, body), 200, cors);
   if (body.action === 'correctAttribution') return json(await correctAttribution(fs, body), 200, cors);
+  if (body.action === 'notifyDecision') return json(await notifyDecision(fs, env, body, new URL(request.url).origin), 200, cors);
   return json({ error: 'unknown_action' }, 400, cors);
 }
 

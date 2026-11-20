@@ -515,6 +515,29 @@ if (PAGE === 'admin') {
   const root = $('#admin');
   let people = [];
   let settings = { ...DEFAULT_SETTINGS };
+  /* Recherche et filtres des candidatures (conservés quand on change d'onglet). */
+  const query = { text: '', ville: '', produit: '', sort: 'recent' };
+
+  /* Villes : « cotonou », « Cotonou » et « COTONOU » sont regroupées. */
+  const foldKey = (v) => String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const cityLabel = (v) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  function cityGroups() {
+    const map = new Map();
+    for (const p of people) {
+      const key = foldKey(p.ville) || '—';
+      if (!map.has(key)) map.set(key, { key, label: key === '—' ? 'Ville non indiquée' : cityLabel(p.ville), people: [] });
+      map.get(key).people.push(p);
+    }
+    return [...map.values()];
+  }
+  const createdMs = (p) => (p.createdAt?.seconds ? p.createdAt.seconds * 1000 : 0);
+  const HOURS_72 = 72 * 3600 * 1000;
+
+  /* E-mail de décision envoyé par le Worker (non bloquant pour l'action). */
+  function notifyDecision(p) {
+    return adminCall('notifyDecision', { ambassadorUid: p.id })
+      .catch((ex) => { console.error('[e-mail de décision]', ex); alert(`La décision est enregistrée, mais l'e-mail à ${p.nom} n'a pas pu partir. Prévenez-le par WhatsApp.`); });
+  }
 
   async function adminCall(action, data) {
     const token = await auth.currentUser.getIdToken();
@@ -548,12 +571,12 @@ if (PAGE === 'admin') {
       ]);
       people = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((x, y) => (y.createdAt?.seconds || 0) - (x.createdAt?.seconds || 0));
       if (sset && sset.exists()) settings = { ...DEFAULT_SETTINGS, ...sset.data() };
-      renderMain('candidates');
+      renderMain('overview');
     } catch (ex) { root.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
   }
 
   function renderMain(tab) {
-    const tabs = [['candidates', 'Candidatures'], ['links', 'Suivi des liens'], ['recap', 'Récapitulatif'], ['settings', 'Réglages']];
+    const tabs = [['overview', 'Vue d’ensemble'], ['candidates', 'Candidatures'], ['links', 'Suivi des liens'], ['recap', 'Récapitulatif'], ['settings', 'Réglages']];
     root.innerHTML = `
       <div class="amb-tabs amb-main-tabs" role="tablist">
         ${tabs.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}">${l}</button>`).join('')}
@@ -561,10 +584,80 @@ if (PAGE === 'admin') {
       <div id="admin-pane"></div>`;
     $$('[data-tab]', root).forEach((b) => b.addEventListener('click', () => renderMain(b.dataset.tab)));
     const pane = $('#admin-pane');
-    if (tab === 'candidates') renderCandidates(pane, 'pending');
+    if (tab === 'overview') renderOverview(pane);
+    else if (tab === 'candidates') renderCandidates(pane, 'pending');
     else if (tab === 'links') renderLinks(pane);
     else if (tab === 'recap') renderRecap(pane);
     else renderSettings(pane);
+  }
+
+  /* ── Vue d'ensemble ── */
+  async function renderOverview(pane) {
+    pane.innerHTML = '<p class="amb-empty">Chargement…</p>';
+    try {
+      const [rsnap, csnap] = await Promise.all([getDocs(collectionGroup(db, 'restaurants')), getDocs(collectionGroup(db, 'commissions'))]);
+      const rests = rsnap.docs.map((d) => d.data());
+      const comms = csnap.docs.map((d) => d.data());
+      const now = Date.now();
+      const pending = people.filter((p) => p.status === 'pending');
+      const late = pending.filter((p) => createdMs(p) && now - createdMs(p) > HOURS_72);
+      const active = people.filter((p) => p.status === 'approved');
+      const week = people.filter((p) => createdMs(p) && now - createdMs(p) < 7 * 24 * 3600 * 1000).length;
+      const inscrits = rests.filter((r) => r.statut !== 'resilie').length;
+      const abonnes = rests.filter((r) => r.statut === 'abonne').length;
+      const month = monthKey();
+      const monthTotal = comms.filter((c) => c.period === month && c.statut !== 'cancelled').reduce((t, c) => t + (Number(c.montant) || 0), 0);
+      const clicks = active.reduce((t, p) => t + (Number(p.clicks) || 0), 0);
+
+      const cities = cityGroups().map((g) => {
+        const ids = new Set(g.people.map((p) => p.id));
+        return {
+          ...g,
+          active: g.people.filter((p) => p.status === 'approved').length,
+          pending: g.people.filter((p) => p.status === 'pending').length,
+          rests: rests.filter((r) => ids.has(r.ambassadeurUid) && r.statut !== 'resilie').length
+        };
+      }).filter((g) => g.active || g.pending || g.rests)
+        .sort((x, y) => (y.active - x.active) || (y.pending - x.pending) || x.label.localeCompare(y.label, 'fr'));
+      const covered = cities.filter((g) => g.active > 0 && g.key !== '—').length;
+      const toCover = cities.filter((g) => g.active === 0 && g.pending > 0 && g.key !== '—');
+      const max = Math.max(1, ...cities.map((g) => g.active + g.pending));
+
+      pane.innerHTML = `
+        ${pending.length ? `<div class="amb-alert ${late.length ? 'is-late' : ''}">
+          <p><b>${pending.length} candidature${pending.length > 1 ? 's' : ''} en attente</b>${late.length ? ` dont <b>${late.length}</b> depuis plus de 72 heures (le délai annoncé aux candidats)` : ''}.</p>
+          <button type="button" class="btn btn--primary" data-go="candidates">Traiter les candidatures</button>
+        </div>` : ''}
+        <ul class="ep-stats amb-kpis amb-overview">
+          <li><b>${active.length}</b><span>ambassadeur${active.length > 1 ? 's' : ''} actif${active.length > 1 ? 's' : ''}</span></li>
+          <li><b>${pending.length}</b><span>en attente</span></li>
+          <li><b>${week}</b><span>candidature${week > 1 ? 's' : ''} cette semaine</span></li>
+          <li><b>${covered}</b><span>ville${covered > 1 ? 's' : ''} couverte${covered > 1 ? 's' : ''}</span></li>
+          <li><b>${clicks}</b><span>clic${clicks > 1 ? 's' : ''} sur les liens</span></li>
+          <li><b>${inscrits}</b><span>restaurant${inscrits > 1 ? 's' : ''} inscrit${inscrits > 1 ? 's' : ''}</span></li>
+          <li><b>${abonnes}</b><span>abonné${abonnes > 1 ? 's' : ''}</span></li>
+          <li><b>${esc(fcfa(monthTotal))}</b><span>commissions ${esc(periodLabel(month))}</span></li>
+        </ul>
+
+        <h2 class="amb-h2">Répartition par ville</h2>
+        ${toCover.length ? `<p class="amb-hint">À couvrir en priorité : ${toCover.map((g) => `<b>${esc(g.label)}</b>`).join(', ')}. Des candidats y attendent, mais aucun ambassadeur n'y est encore actif.</p>` : ''}
+        ${cities.length ? `<div class="amb-table"><table>
+          <thead><tr><th scope="col">Ville</th><th scope="col">Actifs</th><th scope="col">En attente</th><th scope="col">Restaurants</th><th scope="col" class="amb-bar-col">Présence</th></tr></thead>
+          <tbody>${cities.map((g) => `<tr class="${g.active === 0 && g.pending > 0 ? 'is-hot' : ''}">
+            <th scope="row"><button type="button" class="amb-linkbtn" data-city="${esc(g.key)}">${esc(g.label)}</button></th>
+            <td>${g.active}</td><td>${g.pending}</td><td>${g.rests}</td>
+            <td class="amb-bar-col"><span class="amb-bar" role="img" aria-label="${g.active} actifs, ${g.pending} en attente"><i style="width:${(g.active / max) * 100}%"></i><i class="is-pending" style="width:${(g.pending / max) * 100}%"></i></span></td>
+          </tr>`).join('')}</tbody>
+        </table><p>Cliquez sur une ville pour voir ses candidats. Barre verte : actifs ; dorée : en attente.</p></div>` : '<p class="amb-empty">Aucune candidature pour le moment.</p>'}`;
+
+      $$('[data-go]', pane).forEach((b) => b.addEventListener('click', () => renderMain(b.dataset.go)));
+      $$('[data-city]', pane).forEach((b) => b.addEventListener('click', () => {
+        Object.assign(query, { ville: b.dataset.city, text: '', produit: '' });
+        const g = cities.find((x) => x.key === b.dataset.city);
+        renderMain('candidates');
+        if (g && !g.pending && g.active) renderCandidates($('#admin-pane'), 'approved');
+      }));
+    } catch (ex) { pane.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
   }
 
   /* ── Candidatures ── */
@@ -572,17 +665,83 @@ if (PAGE === 'admin') {
   const STATE_LABEL = { pending: 'En attente', approved: 'Actif', suspended: 'Suspendu', removed: 'Retiré', rejected: 'Refusé' };
   const STATE_CLS = { pending: 'amb-state--pending', approved: 'amb-state--approved', suspended: 'amb-state--suspended', removed: 'amb-state--removed', rejected: 'amb-state--rejected' };
 
+  function matches(p) {
+    const t = foldKey(query.text);
+    if (t) {
+      const hay = foldKey([p.nom, p.email, p.code, p.ville, p.quartier, p.profession].join(' '));
+      const tel = String(p.whatsapp || '').replace(/\D/g, '');
+      const tDigits = query.text.replace(/\D/g, '');
+      if (!hay.includes(t) && !(tDigits.length >= 3 && tel.includes(tDigits))) return false;
+    }
+    if (query.ville && (foldKey(p.ville) || '—') !== query.ville) return false;
+    if (query.produit && ![...(p.produits || []), ...(p.produitsFuturs || [])].includes(query.produit)) return false;
+    return true;
+  }
+  const SORTS = {
+    recent: (x, y) => createdMs(y) - createdMs(x),
+    old: (x, y) => createdMs(x) - createdMs(y),
+    name: (x, y) => String(x.nom || '').localeCompare(String(y.nom || ''), 'fr'),
+    city: (x, y) => cityLabel(x.ville).localeCompare(cityLabel(y.ville), 'fr') || String(x.nom || '').localeCompare(String(y.nom || ''), 'fr'),
+    clicks: (x, y) => (Number(y.clicks) || 0) - (Number(x.clicks) || 0)
+  };
+
   function renderCandidates(pane, filter) {
     const inBucket = (p, k) => BUCKETS[k].includes(p.status);
-    const count = (k) => people.filter((p) => inBucket(p, k)).length;
-    const list = people.filter((p) => inBucket(p, filter));
+    const cities = cityGroups().sort((x, y) => x.label.localeCompare(y.label, 'fr'));
+    const products = [...new Set(people.flatMap((p) => [...(p.produits || []), ...(p.produitsFuturs || [])]))].sort();
+    if (query.ville && !cities.some((g) => g.key === query.ville)) query.ville = '';
+    const opt = (v, l, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`;
     pane.innerHTML = `
-      <div class="amb-tabs amb-tabs--admin" role="tablist">
-        ${[['pending', 'En attente'], ['approved', 'Validés'], ['rejected', 'Refusés']].map(([k, l]) => `<button type="button" role="tab" data-filter="${k}" aria-selected="${k === filter}">${l} <span>${count(k)}</span></button>`).join('')}
+      <div class="amb-tabs amb-tabs--admin" role="tablist" id="cand-tabs"></div>
+      <div class="amb-toolbar">
+        <input type="search" id="q-text" class="form-control amb-toolbar__search" placeholder="Rechercher : nom, téléphone, e-mail, code…" value="${esc(query.text)}" aria-label="Rechercher un candidat">
+        <select id="q-ville" class="form-control" aria-label="Filtrer par ville">${opt('', 'Toutes les villes', query.ville)}${cities.map((g) => opt(g.key, `${g.label} (${g.people.length})`, query.ville)).join('')}</select>
+        <select id="q-produit" class="form-control" aria-label="Filtrer par produit">${opt('', 'Tous les produits', query.produit)}${products.map((x) => opt(x, x, query.produit)).join('')}</select>
+        <select id="q-sort" class="form-control" aria-label="Trier">${[['recent', 'Plus récentes'], ['old', 'Plus anciennes'], ['name', 'Nom (A → Z)'], ['city', 'Ville'], ['clicks', 'Clics']].map(([v, l]) => opt(v, l, query.sort)).join('')}</select>
+        <button type="button" class="btn btn--ghost" id="q-export">Exporter (CSV)</button>
+        <button type="button" class="amb-linkbtn" id="q-reset">Effacer les filtres</button>
       </div>
-      ${list.length ? `<ul class="amb-people">${list.map(card).join('')}</ul>` : '<p class="amb-empty">Aucun ambassadeur dans cette liste.</p>'}`;
-    $$('[data-filter]', pane).forEach((b) => b.addEventListener('click', () => renderCandidates(pane, b.dataset.filter)));
-    $$('[data-act]', pane).forEach((b) => b.addEventListener('click', () => act(b.dataset.act, b.dataset.id, pane, filter)));
+      <p class="amb-hint" id="cand-count" aria-live="polite"></p>
+      <div id="cand-list"></div>`;
+
+    const drawList = () => {
+      const filtered = people.filter(matches);
+      const count = (k) => filtered.filter((p) => inBucket(p, k)).length;
+      $('#cand-tabs', pane).innerHTML = [['pending', 'En attente'], ['approved', 'Validés'], ['rejected', 'Refusés']].map(([k, l]) => `<button type="button" role="tab" data-filter="${k}" aria-selected="${k === filter}">${l} <span>${count(k)}</span></button>`).join('');
+      const list = filtered.filter((p) => inBucket(p, filter)).sort(SORTS[query.sort] || SORTS.recent);
+      const active = query.text || query.ville || query.produit;
+      $('#cand-count', pane).textContent = active ? `${list.length} résultat${list.length > 1 ? 's' : ''} avec ces filtres.` : '';
+      $('#q-reset', pane).hidden = !active;
+      $('#cand-list', pane).innerHTML = list.length ? `<ul class="amb-people">${list.map(card).join('')}</ul>` : `<p class="amb-empty">${active ? 'Aucun candidat ne correspond à ces filtres.' : 'Aucun ambassadeur dans cette liste.'}</p>`;
+      $$('[data-filter]', pane).forEach((b) => b.addEventListener('click', () => { filter = b.dataset.filter; drawList(); }));
+      $$('[data-act]', pane).forEach((b) => b.addEventListener('click', () => act(b.dataset.act, b.dataset.id, pane, filter)));
+      return list;
+    };
+    let current = drawList();
+    const redraw = () => { current = drawList(); };
+    $('#q-text', pane).addEventListener('input', (e) => { query.text = e.target.value; redraw(); });
+    $('#q-ville', pane).addEventListener('change', (e) => { query.ville = e.target.value; redraw(); });
+    $('#q-produit', pane).addEventListener('change', (e) => { query.produit = e.target.value; redraw(); });
+    $('#q-sort', pane).addEventListener('change', (e) => { query.sort = e.target.value; redraw(); });
+    $('#q-reset', pane).addEventListener('click', () => { Object.assign(query, { text: '', ville: '', produit: '' }); renderCandidates(pane, filter); });
+    $('#q-export', pane).addEventListener('click', () => exportPeople(current, filter));
+  }
+
+  function exportPeople(list, filter) {
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Nom', 'Statut', 'Code', 'WhatsApp', 'E-mail', 'Ville', 'Quartier', 'Profession', 'Réseau', 'Produits', 'Produits (à l’ouverture)', 'Annuaire public', 'Clics', 'Candidature le', 'Motivation'];
+    const lines = [head.map(cell).join(';')];
+    for (const p of list) {
+      lines.push([p.nom, STATE_LABEL[p.status] || p.status, p.code || '', p.whatsapp, p.email, cityLabel(p.ville), p.quartier, p.profession || p.profil || '',
+        (p.reseau || []).join(', '), (p.produits || []).join(', '), (p.produitsFuturs || []).join(', '), p.annuaire === false ? 'Non' : 'Oui',
+        Number(p.clicks) || 0, dateFr(p.createdAt), p.motivation || ''].map(cell).join(';'));
+    }
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `ambassadeurs-${{ pending: 'en-attente', approved: 'valides', rejected: 'refuses' }[filter] || filter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   function card(p) {
@@ -600,7 +759,7 @@ if (PAGE === 'admin') {
         <div><dt>Profession</dt><dd>${esc(p.profession || p.profil || '—')}</dd></div>
         <div><dt>Réseau</dt><dd>${esc((p.reseau || []).join(', ') || p.reseaux || '—')}</dd></div>
         <div><dt>Profil</dt><dd>${p.profilLien && isHttpUrl(p.profilLien) ? `<a href="${esc(p.profilLien)}" target="_blank" rel="noopener">Voir le profil ↗</a>` : (p.profilLien ? esc(p.profilLien) : '—')}</dd></div>
-        <div><dt>Produits</dt><dd>${esc((p.produits || []).join(', '))}${p.produitsFuturs?.length ? ' · plus tard : ' + esc(p.produitsFuturs.join(', ')) : ''}</dd></div>
+        <div><dt>Produits</dt><dd>${esc([(p.produits || []).join(', '), p.produitsFuturs?.length ? 'plus tard : ' + p.produitsFuturs.join(', ') : ''].filter(Boolean).join(' · ') || '—')}</dd></div>
         <div><dt>Annuaire public</dt><dd>${p.annuaire === false ? 'Refusé' : 'Accepté'}</dd></div>
         <div class="is-wide"><dt>Motivation</dt><dd>${esc(p.motivation || p.methode || '—')}</dd></div>
       </dl>
@@ -630,15 +789,18 @@ if (PAGE === 'admin') {
     const p = people.find((x) => x.id === id);
     try {
       if (what === 'approve') {
+        if (!confirm(`Valider la candidature de ${p.nom} ? Un e-mail de bienvenue avec son code et son lien lui sera envoyé.`)) return;
         const code = p.code || uniqueCode();
         await updateDoc(doc(db, 'ambassadors', id), { status: 'approved', code, approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
         Object.assign(p, { status: 'approved', code });
         renderCandidates(pane, filter);
+        notifyDecision(p);
       } else if (what === 'reject') {
-        if (!confirm(`Refuser la candidature de ${p.nom} ?`)) return;
+        if (!confirm(`Refuser la candidature de ${p.nom} ? Un e-mail l'en informera.`)) return;
         await updateDoc(doc(db, 'ambassadors', id), { status: 'rejected', updatedAt: serverTimestamp() });
         p.status = 'rejected';
         renderCandidates(pane, filter);
+        notifyDecision(p);
       } else if (what === 'suspend') {
         if (!confirm(`Suspendre ${p.nom} ? Son lien cesse de compter et sa fiche sera signalée comme suspendue dans l'annuaire.`)) return;
         await updateDoc(doc(db, 'ambassadors', id), { status: 'suspended', updatedAt: serverTimestamp() });
