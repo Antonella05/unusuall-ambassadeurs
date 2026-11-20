@@ -1,41 +1,29 @@
-/* UNUSUALL Ambassadeurs — e-mails envoyés aux candidats.
-   applicationAck : accusé de réception de candidature (envoyé une seule fois,
-   juste après l'enregistrement de la candidature). */
+/* UNUSUALL Ambassadeurs — e-mails envoyés aux candidats, tous sur la même mise en page.
+   verifyEmail   : confirmation de l'adresse e-mail (à la création du compte) ;
+   passwordReset : choix d'un nouveau mot de passe ;
+   applicationAck : accusé de réception de candidature. */
 
 const SITE = 'https://ambassadeurs.unusuall.online';
 const LOGO = `${SITE}/assets/img/icon-192-mark.png`;
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const firstName = (nom) => String(nom || '').trim().split(/\s+/)[0] || '';
+const helloFor = (nom) => (firstName(nom) ? `Bonjour ${firstName(nom)},` : 'Bonjour,');
 
-export function applicationAck({ nom, ville } = {}) {
-  const prenom = firstName(nom);
-  const hello = prenom ? `Bonjour ${prenom},` : 'Bonjour,';
-  const city = String(ville || '').trim();
-  const share = `Je viens de postuler au programme Ambassadeurs UNUSUALL : on fait connaître leurs solutions et on est payé chaque mois. C'est gratuit, ouvert dans toutes les villes. Regarde : ${SITE}`;
-  const whatsapp = `https://wa.me/?text=${encodeURIComponent(share)}`;
-  const subject = 'Votre candidature Ambassadeur UNUSUALL est bien reçue';
+const P = 'margin:0 0 14px;font-size:16px;line-height:1.6;';
+const button = (href, label) => `
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 22px;"><tr>
+          <td style="border-radius:999px;background:#1a472a;">
+            <a href="${esc(href)}" style="display:inline-block;padding:14px 26px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;">${esc(label)}</a>
+          </td>
+        </tr></table>`;
+const fallbackLink = (href) => `
+        <p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#5a7260;">Le bouton ne fonctionne pas&nbsp;? Copiez ce lien dans votre navigateur&nbsp;:<br>
+          <a href="${esc(href)}" style="color:#1a472a;word-break:break-all;">${esc(href)}</a></p>`;
 
-  const text = [
-    hello,
-    '',
-    'Merci pour votre candidature au programme Ambassadeurs UNUSUALL. Elle est bien arrivée chez nous.',
-    '',
-    'Notre équipe l\'étudie et vous répond sous 72 heures, par e-mail ou sur WhatsApp. Dès qu\'elle est validée, votre lien personnel, votre QR code et votre tableau de bord apparaîtront dans votre espace.',
-    '',
-    `Un coup de pouce en attendant ? Nous voulons des ambassadeurs dans un maximum de villes et de régions${city ? `, pas seulement à ${city}` : ''}. Si vous connaissez quelqu'un ailleurs qui aimerait rejoindre l'aventure, envoyez-lui ce lien :`,
-    SITE,
-    '',
-    `Partager sur WhatsApp : ${whatsapp}`,
-    '',
-    'À très vite,',
-    'L\'équipe UNUSUALL',
-    '',
-    `Suivre votre candidature : ${SITE}/espace.html`,
-    'Une question ? Répondez simplement à cet e-mail ou écrivez à services@unusuall.online.'
-  ].join('\n');
-
-  const html = `<!doctype html>
+/* Cadre commun : logo, carte blanche, pied de page. */
+function layout({ subject, preheader, pill, title, body }) {
+  return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -44,7 +32,7 @@ export function applicationAck({ nom, ville } = {}) {
 <title>${esc(subject)}</title>
 </head>
 <body style="margin:0;padding:0;background:#f4faf6;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Réponse sous 72 heures. En attendant, aidez-nous à trouver des ambassadeurs dans d'autres villes.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4faf6;">
   <tr><td align="center" style="padding:32px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#0d2818;">
@@ -57,11 +45,78 @@ export function applicationAck({ nom, ville } = {}) {
       </td></tr>
 
       <tr><td style="background:#ffffff;border:1px solid #c5ddd0;border-radius:20px;padding:36px 32px;">
-        <p style="margin:0 0 14px;display:inline-block;padding:6px 12px;border-radius:999px;background:#fef3dc;color:#8a5a00;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Candidature reçue</p>
-        <h1 style="margin:6px 0 18px;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-0.5px;color:#0d2818;">Merci, c'est bien noté&nbsp;!</h1>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6;">${esc(hello)}</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6;">Votre candidature au programme <b>Ambassadeurs UNUSUALL</b> est bien arrivée chez nous.</p>
-        <p style="margin:0 0 24px;font-size:16px;line-height:1.6;">Notre équipe l'étudie et vous répond <b>sous 72&nbsp;heures</b>, par e-mail ou sur WhatsApp. Dès qu'elle est validée, votre lien personnel, votre QR code et votre tableau de bord apparaîtront dans votre espace.</p>
+        <p style="margin:0 0 14px;display:inline-block;padding:6px 12px;border-radius:999px;background:#fef3dc;color:#8a5a00;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${esc(pill)}</p>
+        <h1 style="margin:6px 0 18px;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-0.5px;color:#0d2818;">${title}</h1>
+${body}
+        <p style="margin:26px 0 0;font-size:16px;line-height:1.6;">À très vite,<br><b>L'équipe UNUSUALL</b></p>
+      </td></tr>
+
+      <tr><td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:#5a7260;text-align:center;">
+        <a href="${SITE}" style="color:#1a472a;font-weight:600;">ambassadeurs.unusuall.online</a>
+        &nbsp;·&nbsp; Une question&nbsp;? Répondez à cet e-mail ou écrivez à
+        <a href="mailto:services@unusuall.online" style="color:#1a472a;">services@unusuall.online</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+const SIGNATURE = ['', 'À très vite,', "L'équipe UNUSUALL", '', 'Une question ? Répondez à cet e-mail ou écrivez à services@unusuall.online.'];
+
+export function verifyEmail({ nom, link }) {
+  const subject = 'Confirmez votre adresse e-mail · Ambassadeurs UNUSUALL';
+  const hello = helloFor(nom);
+  const html = layout({
+    subject,
+    preheader: 'Un clic pour confirmer votre adresse, puis vous pourrez envoyer votre candidature.',
+    pill: 'Étape 1 sur 2',
+    title: 'Confirmez votre adresse e-mail',
+    body: `
+        <p style="${P}">${esc(hello)}</p>
+        <p style="${P}">Merci d'avoir créé votre compte sur la plateforme <b>Ambassadeurs UNUSUALL</b>. Cliquez sur le bouton ci-dessous pour confirmer votre adresse. Vous pourrez ensuite remplir votre candidature.</p>
+${button(link, 'Confirmer mon adresse')}
+${fallbackLink(link)}
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#5a7260;">Vous n'avez pas créé de compte&nbsp;? Ignorez simplement cet e-mail.</p>`
+  });
+  const text = [hello, '', "Merci d'avoir créé votre compte sur la plateforme Ambassadeurs UNUSUALL. Ouvrez ce lien pour confirmer votre adresse, vous pourrez ensuite remplir votre candidature :", link, '', "Vous n'avez pas créé de compte ? Ignorez simplement cet e-mail.", ...SIGNATURE].join('\n');
+  return { subject, html, text };
+}
+
+export function passwordReset({ link }) {
+  const subject = 'Choisissez un nouveau mot de passe · Ambassadeurs UNUSUALL';
+  const html = layout({
+    subject,
+    preheader: 'Le lien pour choisir un nouveau mot de passe est valable une heure.',
+    pill: 'Mot de passe',
+    title: 'Choisissez un nouveau mot de passe',
+    body: `
+        <p style="${P}">Bonjour,</p>
+        <p style="${P}">Vous avez demandé à changer le mot de passe de votre compte <b>Ambassadeurs UNUSUALL</b>. Cliquez sur le bouton ci-dessous pour en choisir un nouveau. Le lien est valable une heure.</p>
+${button(link, 'Choisir un nouveau mot de passe')}
+${fallbackLink(link)}
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#5a7260;">Vous n'êtes pas à l'origine de cette demande&nbsp;? Ignorez cet e-mail : votre mot de passe actuel reste valable.</p>`
+  });
+  const text = ['Bonjour,', '', 'Vous avez demandé à changer le mot de passe de votre compte Ambassadeurs UNUSUALL. Ouvrez ce lien pour en choisir un nouveau (valable une heure) :', link, '', "Vous n'êtes pas à l'origine de cette demande ? Ignorez cet e-mail : votre mot de passe actuel reste valable.", ...SIGNATURE].join('\n');
+  return { subject, html, text };
+}
+
+export function applicationAck({ nom, ville } = {}) {
+  const hello = helloFor(nom);
+  const city = String(ville || '').trim();
+  const share = `Je viens de postuler au programme Ambassadeurs UNUSUALL : on fait connaître leurs solutions et on est payé chaque mois. C'est gratuit, ouvert dans toutes les villes. Regarde : ${SITE}`;
+  const whatsapp = `https://wa.me/?text=${encodeURIComponent(share)}`;
+  const subject = 'Votre candidature Ambassadeur UNUSUALL est bien reçue';
+  const html = layout({
+    subject,
+    preheader: "Réponse sous 72 heures. En attendant, aidez-nous à trouver des ambassadeurs dans d'autres villes.",
+    pill: 'Candidature reçue',
+    title: "Merci, c'est bien noté&nbsp;!",
+    body: `
+        <p style="${P}">${esc(hello)}</p>
+        <p style="${P}">Votre candidature au programme <b>Ambassadeurs UNUSUALL</b> est bien arrivée chez nous.</p>
+        <p style="margin:0 0 24px;font-size:16px;line-height:1.6;">Notre équipe l'étudie et vous répond <b>sous 72&nbsp;heures</b>, par e-mail ou sur WhatsApp. Dès qu'elle est validée, votre lien personnel, votre QR code et votre tableau de bord apparaîtront dans <a href="${SITE}/espace.html" style="color:#1a472a;font-weight:600;">votre espace</a>.</p>
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eaf5ee;border-radius:16px;">
           <tr><td style="padding:24px 22px;">
@@ -74,22 +129,18 @@ export function applicationAck({ nom, ville } = {}) {
             </tr></table>
             <p style="margin:14px 0 0;font-size:14px;color:#3d5a47;">Ou copiez le lien&nbsp;: <a href="${SITE}" style="color:#1a472a;font-weight:700;">ambassadeurs.unusuall.online</a></p>
           </td></tr>
-        </table>
-
-        <p style="margin:26px 0 0;font-size:16px;line-height:1.6;">À très vite,<br><b>L'équipe UNUSUALL</b></p>
-      </td></tr>
-
-      <tr><td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:#5a7260;text-align:center;">
-        <a href="${SITE}/espace.html" style="color:#1a472a;font-weight:600;">Suivre ma candidature</a>
-        &nbsp;·&nbsp; Une question&nbsp;? Répondez à cet e-mail ou écrivez à
-        <a href="mailto:services@unusuall.online" style="color:#1a472a;">services@unusuall.online</a>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
-
+        </table>`
+  });
+  const text = [
+    hello, '',
+    'Merci pour votre candidature au programme Ambassadeurs UNUSUALL. Elle est bien arrivée chez nous.', '',
+    "Notre équipe l'étudie et vous répond sous 72 heures, par e-mail ou sur WhatsApp. Dès qu'elle est validée, votre lien personnel, votre QR code et votre tableau de bord apparaîtront dans votre espace :",
+    `${SITE}/espace.html`, '',
+    `Un coup de pouce en attendant ? Nous voulons des ambassadeurs dans un maximum de villes et de régions${city ? `, pas seulement à ${city}` : ''}. Si vous connaissez quelqu'un ailleurs qui aimerait rejoindre l'aventure, envoyez-lui ce lien :`,
+    SITE, '',
+    `Partager sur WhatsApp : ${whatsapp}`,
+    ...SIGNATURE
+  ].join('\n');
   return { subject, html, text };
 }
 

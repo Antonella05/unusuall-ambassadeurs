@@ -48,6 +48,21 @@ const periodLabel = (p) => {
   const [y, m] = String(p || '').split('-').map(Number);
   return y && m ? new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '—';
 };
+/* E-mails de validation et de mot de passe : envoyés par le Worker avec la
+   charte UNUSUALL ; en cas de panne, repli sur l'e-mail standard de Firebase. */
+async function workerMail(path, { user, body } = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (user) headers.Authorization = `Bearer ${await user.getIdToken(true)}`;
+  const res = await fetch(`${FUNCTIONS_ORIGIN}${path}`, { method: 'POST', headers, body: JSON.stringify(body || {}) });
+  if (res.status === 429) throw Object.assign(new Error('too-many-requests'), { code: 'auth/too-many-requests' });
+  if (!res.ok) throw new Error(`Worker ${path} : ${res.status}`);
+}
+const tooMany = (ex) => ex?.code === 'auth/too-many-requests';
+const sendVerification = (user) => workerMail('/verify-email', { user })
+  .catch((ex) => (tooMany(ex) ? Promise.reject(ex) : sendEmailVerification(user)));
+const sendReset = (email) => workerMail('/reset-password', { body: { email } })
+  .catch((ex) => (tooMany(ex) ? Promise.reject(ex) : sendPasswordResetEmail(auth, email)));
+
 const referralLink = (code) => `${FUNCTIONS_ORIGIN}/go?a=${encodeURIComponent(code || '')}`;
 const qrLink = (code) => `${FUNCTIONS_ORIGIN}/qr?a=${encodeURIComponent(code || '')}`;
 
@@ -188,7 +203,7 @@ if (PAGE === 'login') {
       const cred = await createUserWithEmailAndPassword(auth, mail, pass);
       await updateProfile(cred.user, { displayName: nom });
       /* E-mail de confirmation : la candidature n'est possible qu'une fois l'adresse vérifiée. */
-      await sendEmailVerification(cred.user).catch((ex) => console.error('[vérification e-mail]', ex));
+      await sendVerification(cred.user).catch((ex) => console.error('[vérification e-mail]', ex));
       location.replace('espace.html');
     } catch (ex) {
       console.error('[inscription]', ex);
@@ -208,7 +223,7 @@ if (PAGE === 'login') {
     if (!emailOk(mail)) { flag(f.email); show(err, `« ${mail} » n'est pas une adresse e-mail valide. Exemple : nom@domaine.com`); return f.email.focus(); }
     busy(btn, true, 'Envoi…');
     try {
-      await sendPasswordResetEmail(auth, mail);
+      await sendReset(mail);
       show(info, 'Si un compte existe avec cette adresse, vous allez recevoir un e-mail pour choisir un nouveau mot de passe. Pensez à regarder vos spams.');
     } catch (ex) {
       console.error('[mot de passe oublié]', ex);
@@ -295,7 +310,7 @@ if (PAGE === 'space') {
       show(err, ''); show(info, '');
       busy(btn, true, 'Envoi…');
       try {
-        await sendEmailVerification(user);
+        await sendVerification(user);
         show(info, 'E-mail renvoyé. Il peut mettre quelques minutes à arriver.');
       } catch (ex) {
         console.error('[vérification e-mail]', ex);

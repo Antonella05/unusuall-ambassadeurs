@@ -3,16 +3,27 @@
             /directory (annuaire public), /webhook (événements Epicure, secret),
             dont restaurant.cancelled (résiliation),
             /admin (actions admin, jeton Firebase),
-            /apply-ack (accusé de réception de candidature par e-mail, jeton Firebase).
+            /apply-ack (accusé de réception de candidature par e-mail, jeton Firebase),
+            /verify-email (lien de confirmation d'adresse, jeton Firebase),
+            /reset-password (lien de nouveau mot de passe, public).
+   Les e-mails partent via Resend avec la mise en page de worker/mail.js.
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
-import { applicationAck, sendMail } from './mail.js';
+import { applicationAck, verifyEmail, passwordReset, sendMail } from './mail.js';
 
 const PROJECT = 'unusuall-ambassadeurs';
 const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
 const API_BASE = `https://firestore.googleapis.com/v1/${DOC_ROOT}`;
 const ALLOWED_ORIGINS = ['https://ambassadeurs.unusuall.online', 'http://127.0.0.1:8123', 'http://localhost:8123'];
+const CONTINUE_URL = 'https://ambassadeurs.unusuall.online/espace.html';
+const CORS_PATHS = ['/admin', '/apply-ack', '/verify-email', '/reset-password'];
+const corsFor = (request) => {
+  const origin = request.headers.get('Origin') || '';
+  return ALLOWED_ORIGINS.includes(origin)
+    ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' }
+    : {};
+};
 
 const DEFAULT_SETTINGS = {
   firstPct: 30, recurringPct: 10, offeredMonth: 2, maxMonths: 12,
@@ -80,16 +91,17 @@ const pemToDer = (pem) => Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, '
 class Firestore {
   constructor(env) {
     this.sa = JSON.parse(env.SERVICE_ACCOUNT_JSON);
-    this.token = null;
-    this.expires = 0;
+    this.tokens = {};
   }
-  async accessToken() {
-    if (this.token && Date.now() < this.expires - 60000) return this.token;
+  /* Jeton OAuth du compte de service, mis en cache par périmètre (scope). */
+  async accessToken(scope = 'https://www.googleapis.com/auth/datastore') {
+    const cached = this.tokens[scope];
+    if (cached && Date.now() < cached.expires - 60000) return cached.token;
     const now = Math.floor(Date.now() / 1000);
     const head = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
     const claims = b64url(JSON.stringify({
       iss: this.sa.client_email,
-      scope: 'https://www.googleapis.com/auth/datastore',
+      scope,
       aud: 'https://oauth2.googleapis.com/token',
       iat: now, exp: now + 3600
     }));
@@ -101,10 +113,33 @@ class Firestore {
       body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${head}.${claims}.${b64urlBytes(sig)}`
     });
     const data = await res.json();
-    if (!res.ok) throw new Error('OAuth Firestore impossible : ' + JSON.stringify(data));
-    this.token = data.access_token;
-    this.expires = Date.now() + (Number(data.expires_in) || 3600) * 1000;
-    return this.token;
+    if (!res.ok) throw new Error('OAuth Google impossible : ' + JSON.stringify(data));
+    this.tokens[scope] = { token: data.access_token, expires: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+    return data.access_token;
+  }
+  /* Lien d'action Firebase Auth (VERIFY_EMAIL, PASSWORD_RESET) généré sans
+     qu'aucun e-mail Firebase ne parte : on l'envoie nous-mêmes via Resend.
+     Renvoie null si aucun compte n'existe pour cette adresse. */
+  async oobLink(requestType, email) {
+    const token = await this.accessToken('https://www.googleapis.com/auth/cloud-platform');
+    const send = async (withContinue) => {
+      const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:sendOobCode`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Firebase-Locale': 'fr' },
+        body: JSON.stringify({ requestType, email, returnOobLink: true, ...(withContinue ? { continueUrl: CONTINUE_URL } : {}) })
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data, msg: String(data.error?.message || '') };
+    };
+    let r = await send(true);
+    /* Domaine de retour non autorisé dans Firebase : on retente sans lien de retour. */
+    if (!r.ok && /CONTINUE_URI|UNAUTHORIZED_DOMAIN|INVALID_CONTINUE/i.test(r.msg)) r = await send(false);
+    /* Compte inexistant : erreur explicite, ou succès sans lien quand la
+       protection contre l'énumération des e-mails est active dans Firebase. */
+    if (!r.ok && /EMAIL_NOT_FOUND|USER_NOT_FOUND/i.test(r.msg)) return null;
+    if (r.ok && !r.data.oobLink) return null;
+    if (!r.ok) throw new Error('Lien Firebase impossible : ' + (r.msg || `HTTP ${r.status}`));
+    return r.data.oobLink;
   }
   async call(path, method = 'GET', body) {
     const token = await this.accessToken();
@@ -709,12 +744,55 @@ async function applyAck(request, env, fs) {
   return json({ ok: true }, 200, cors);
 }
 
+/* Anti-abus : un envoi par minute et par clé (compte ou adresse). */
+async function throttle(fs, path, field, seconds = 60) {
+  const prev = await fs.data(path);
+  const last = prev && prev[field] ? new Date(prev[field]).getTime() : 0;
+  if (Date.now() - last < seconds * 1000) throw httpErr(429, 'too-many-requests', "Trop d'envois rapprochés. Patientez une minute avant de redemander l'e-mail.");
+  await fs.commit([{ update: { name: docName(path), fields: encFields({ [field]: new Date() }) }, updateMask: { fieldPaths: [field] } }]);
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* Confirmation d'adresse : remplace l'e-mail Firebase par le nôtre. */
+async function verifyEmailRoute(request, env, fs) {
+  const cors = corsFor(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  const claims = await verifyIdTokenClaims((request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+  if (!claims.email) throw httpErr(400, 'invalid-argument', 'Aucune adresse e-mail sur ce compte.');
+  if (claims.email_verified === true) return json({ ok: true, alreadyVerified: true }, 200, cors);
+  await throttle(fs, `verifyLog/${claims.sub}`, 'lastAt');
+  const link = await fs.oobLink('VERIFY_EMAIL', claims.email);
+  if (!link) throw httpErr(404, 'not-found', 'Compte introuvable.');
+  await sendMail(env, { to: claims.email, ...verifyEmail({ nom: claims.name, link }) });
+  return json({ ok: true }, 200, cors);
+}
+
+/* Mot de passe oublié : même réponse que le compte existe ou non (pas de fuite). */
+async function resetPasswordRoute(request, env, fs) {
+  const cors = corsFor(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  let body;
+  try { body = await request.json(); } catch { throw httpErr(400, 'invalid-argument', 'Corps JSON invalide.'); }
+  const email = str(body.email).toLowerCase().slice(0, 200);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw httpErr(400, 'invalid-argument', 'Adresse e-mail invalide.');
+  await throttle(fs, `resetLog/${await sha256Hex(email)}`, 'lastAt');
+  const link = await fs.oobLink('PASSWORD_RESET', email);
+  if (link) await sendMail(env, { to: email, ...passwordReset({ link }) });
+  return json({ ok: true }, 200, cors);
+}
+
 /* ───────── Point d'entrée ───────── */
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
-    const cors = (url.pathname === '/admin' || url.pathname === '/apply-ack') && ALLOWED_ORIGINS.includes(origin)
+    const cors = CORS_PATHS.includes(url.pathname) && ALLOWED_ORIGINS.includes(origin)
       ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' }
       : {};
     try {
@@ -726,6 +804,8 @@ export default {
       if (url.pathname === '/webhook') return await webhook(request, env, fs);
       if (url.pathname === '/admin') return await admin(request, env, fs);
       if (url.pathname === '/apply-ack') return await applyAck(request, env, fs);
+      if (url.pathname === '/verify-email') return await verifyEmailRoute(request, env, fs);
+      if (url.pathname === '/reset-password') return await resetPasswordRoute(request, env, fs);
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });
       return json({ error: 'not_found' }, 404);
     } catch (err) {
