@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '18';
+const V = '19';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -70,10 +70,12 @@ function page({ file, title, desc, windowTitle, back, body, jsonld, account, scr
   <meta property="og:url" content="${url}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:image" content="${ORIGIN}/assets/img/og.jpg">
+  <meta property="og:image" content="${ORIGIN}/assets/img/og-reseau-or.jpg">
+  <meta property="og:image:alt" content="Votre réseau vaut de l'or. Devenez ambassadeur UNUSUALL.">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${ORIGIN}/assets/img/og-reseau-or.jpg">
   <link rel="icon" href="assets/img/icon-32-mark.png" type="image/png" sizes="32x32">
   <link rel="icon" href="assets/img/icon-192-mark.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="assets/img/icon-180-mark.png" sizes="180x180">
@@ -198,7 +200,7 @@ const FEED = `
 PAGES.push({
   file: 'index.html',
   title: 'Devenez Ambassadeur UNUSUALL · Programme Ambassadeurs',
-  desc: "Parlez de nos produits autour de vous et gagnez de l'argent chaque mois. 30 % du premier mois, puis 10 % chaque mois, et 30 % à nouveau chaque année. Inscription gratuite.",
+  desc: "Votre réseau vaut de l'or. Parlez de nos produits autour de vous et soyez payé chaque mois : 30 % du premier mois, puis 10 % chaque mois. Inscription gratuite.",
   windowTitle: 'Programme Ambassadeurs',
   body: `${SUBNAV([['index.html', 'Programme'], ['postuler.html', 'Postuler']], 'index.html')}
           <div class="amb-hero">
