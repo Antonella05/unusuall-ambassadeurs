@@ -720,3 +720,15 @@
   .app-footer__grid { grid-template-columns: 1fr; }
   .app-footer__col-spacer { display: none; }
 }
+
+/* Suppression de compte */
+.amb-danger-zone { margin-top: 32px; padding-top: 20px; border-top: 0.5px solid var(--border); }
+.amb-danger-zone p { margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: var(--text-secondary); }
+.amb-danger { color: #b3261e; border-color: rgba(179, 38, 30, .45); }
+.amb-danger:hover { background: rgba(179, 38, 30, .08); }
+[data-theme="dark"] .amb-danger { color: #ff8a80; border-color: rgba(255, 138, 128, .45); }
+.amb-delete { width: min(420px, calc(100vw - 40px)); text-align: left; }
+.amb-delete h3 { margin: 0 0 8px; font-size: 18px; }
+.amb-delete p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; text-align: left; font-family: inherit; color: var(--text-secondary); }
+.amb-delete .pg-cta { margin-top: 16px; }
+.amb-danger-btn { background: #b3261e; border-color: #b3261e; color: #fff; }

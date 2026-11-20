@@ -5,7 +5,8 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  sendPasswordResetEmail, signOut, updateProfile, sendEmailVerification
+  sendPasswordResetEmail, signOut, updateProfile, sendEmailVerification,
+  reauthenticateWithCredential, EmailAuthProvider
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, collection, collectionGroup, getDocs,
@@ -241,6 +242,7 @@ if (PAGE === 'space') {
     if (!user) return location.replace('connexion.html?next=espace.html');
     $('#space-hello').textContent = `Bonjour ${user.displayName || ''}`.trim();
     $('#logout').addEventListener('click', () => signOut(auth).then(() => location.replace('connexion.html')));
+    setupDeleteAccount(user);
     try {
       const snap = await getDoc(doc(db, 'ambassadors', user.uid));
       if (!snap.exists()) return user.emailVerified ? showApply(user) : showVerify(user);
@@ -252,6 +254,60 @@ if (PAGE === 'space') {
       root.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`;
     }
   });
+
+  /* Suppression de son propre compte (admins exclus côté serveur) :
+     mot de passe redemandé, puis le Worker efface la fiche, les données et l'accès. */
+  function setupDeleteAccount(user) {
+    if ($('#danger-zone')) return;
+    root.insertAdjacentHTML('afterend', `
+      <section class="amb-block amb-danger-zone" id="danger-zone">
+        <h2>Supprimer mon compte</h2>
+        <p>Vous pouvez quitter le programme à tout moment. Votre compte, votre candidature, votre lien personnel, vos restaurants et l'historique de vos gains seront effacés définitivement, sans retour possible.</p>
+        <button type="button" class="btn btn--ghost amb-danger" id="delete-open">Supprimer mon compte</button>
+      </section>
+      <dialog id="delete-dialog" class="amb-qr amb-delete">
+        <form id="delete-form" novalidate>
+          <h3>Supprimer définitivement mon compte ?</h3>
+          <p>Cette action est irréversible. Confirmez avec votre mot de passe.</p>
+          <p class="amb-info" id="delete-unpaid" hidden></p>
+          <div class="form-group"><label for="delete-pass">Mot de passe</label><input id="delete-pass" name="password" type="password" class="form-control" autocomplete="current-password" required></div>
+          <p class="form-error" id="delete-error" role="alert" hidden></p>
+          <div class="pg-cta"><button type="submit" class="btn btn--primary amb-danger-btn">Supprimer définitivement</button><button type="button" class="btn btn--ghost" id="delete-cancel">Annuler</button></div>
+        </form>
+      </dialog>`);
+    const dlg = $('#delete-dialog'), f = $('#delete-form'), err = $('#delete-error'), unpaidBox = $('#delete-unpaid');
+    let force = false;
+    $('#delete-open').addEventListener('click', () => { force = false; f.reset(); show(err, ''); show(unpaidBox, ''); dlg.showModal(); f.password.focus(); });
+    $('#delete-cancel').addEventListener('click', () => dlg.close());
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = f.querySelector('button[type=submit]');
+      show(err, '');
+      if (!f.password.value) { flag(f.password); return show(err, 'Indiquez votre mot de passe.'); }
+      busy(btn, true, 'Suppression…');
+      try {
+        await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, f.password.value));
+        const res = await fetch(`${FUNCTIONS_ORIGIN}/delete-account`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken(true)}` },
+          body: JSON.stringify({ force })
+        });
+        const out = await res.json().catch(() => ({}));
+        if (res.status === 409 && out.unpaid) {
+          force = true;
+          show(unpaidBox, `Attention : ${fcfa(out.unpaid)} de commissions ne vous ont pas encore été versées. Si vous supprimez votre compte, elles seront perdues. Cliquez de nouveau sur « Supprimer définitivement » pour confirmer.`);
+          return busy(btn, false);
+        }
+        if (!res.ok) throw { code: out.code || 'internal', message: out.error };
+        await signOut(auth).catch(() => {});
+        location.replace('index.html?compte=supprime');
+      } catch (ex) {
+        console.error('[suppression du compte]', ex);
+        show(err, errText(ex));
+        busy(btn, false);
+      }
+    });
+  }
 
   function statusCard(a) {
     const rejected = a.status === 'rejected';
@@ -547,7 +603,7 @@ if (PAGE === 'admin') {
       body: JSON.stringify({ action, ...data })
     });
     const out = await res.json().catch(() => ({}));
-    if (!res.ok) throw { code: out.code || 'internal', message: out.error };
+    if (!res.ok) throw { code: out.code || 'internal', message: out.error, unpaid: out.unpaid };
     return out;
   }
 
@@ -774,6 +830,9 @@ if (PAGE === 'admin') {
         ${(p.status === 'suspended' || p.status === 'removed') ? `<button type="button" class="btn btn--primary" data-act="reactivate" data-id="${esc(p.id)}">Réactiver</button>` : ''}
         ${(p.status === 'approved' || p.status === 'suspended') ? `<button type="button" class="btn btn--ghost" data-act="remove" data-id="${esc(p.id)}">Retirer</button>` : ''}
         ${p.status === 'pending' ? `<button type="button" class="btn btn--ghost" data-act="reject" data-id="${esc(p.id)}">Refuser</button>` : ''}
+        <button type="button" class="btn btn--ghost" data-act="edit" data-id="${esc(p.id)}">Modifier la fiche</button>
+        ${p.email ? `<button type="button" class="btn btn--ghost" data-act="reset" data-id="${esc(p.id)}">Lien mot de passe</button>` : ''}
+        <button type="button" class="btn btn--ghost amb-danger" data-act="delete" data-id="${esc(p.id)}">Supprimer le compte</button>
       </div>
       <div class="amb-manage" id="m-${esc(p.id)}" hidden></div>
     </li>`;
@@ -823,12 +882,72 @@ if (PAGE === 'admin') {
         const box = $(`#m-${CSS.escape(p.id)}`);
         if (!box.hidden) { box.hidden = true; return; }
         await renderDetail(box, p);
+      } else if (what === 'edit') {
+        const box = $(`#m-${CSS.escape(p.id)}`);
+        if (!box.hidden && box.dataset.mode === 'edit') { box.hidden = true; return; }
+        renderEdit(box, p, pane, filter);
+      } else if (what === 'reset') {
+        if (!confirm(`Envoyer à ${p.nom} (${p.email}) un e-mail pour choisir un nouveau mot de passe ?`)) return;
+        await adminCall('sendReset', { ambassadorUid: id });
+        alert(`E-mail envoyé à ${p.email}.`);
+      } else if (what === 'delete') {
+        await deleteAccount(p, pane, filter);
       }
-    } catch (ex) { alert(errText(ex)); }
+    } catch (ex) { alert(ex?.code === 'too-many-requests' ? 'Un e-mail vient déjà d’être envoyé. Patientez une minute.' : errText(ex)); }
+  }
+
+  /* Suppression définitive : fiche, restaurants, gains, versements et accès de connexion. */
+  async function deleteAccount(p, pane, filter) {
+    const typed = prompt(`Supprimer DÉFINITIVEMENT le compte de ${p.nom} ?\n\nSa fiche, ses restaurants, ses commissions, ses versements et son accès de connexion seront effacés. Son lien cessera de fonctionner. Cette action est irréversible.\n\nTapez SUPPRIMER pour confirmer.`);
+    if (typed === null) return;
+    if (typed.trim().toUpperCase() !== 'SUPPRIMER') return alert('Suppression annulée : le mot de confirmation est incorrect.');
+    try {
+      await adminCall('deleteAccount', { ambassadorUid: p.id });
+    } catch (ex) {
+      if (ex?.code !== 'failed-precondition' || !ex.unpaid) throw ex;
+      if (!confirm(`${p.nom} a encore ${fcfa(ex.unpaid)} de commissions non versées. Supprimer quand même ? Ces données seront perdues.`)) return;
+      await adminCall('deleteAccount', { ambassadorUid: p.id, force: true });
+    }
+    people = people.filter((x) => x.id !== p.id);
+    renderCandidates(pane, filter);
+  }
+
+  /* Modification des coordonnées par l'administration. */
+  function renderEdit(box, p, pane, filter) {
+    const fields = [['nom', 'Nom et prénom', 100], ['whatsapp', 'WhatsApp', 30], ['ville', 'Ville', 80], ['quartier', 'Quartier', 80], ['profession', 'Profession', 100]];
+    box.hidden = false;
+    box.dataset.mode = 'edit';
+    box.innerHTML = `
+      <form class="pg-form amb-settings" novalidate>
+        ${fields.map(([k, l, max]) => `<div class="form-group"><label for="ed-${esc(p.id)}-${k}">${l}</label><input id="ed-${esc(p.id)}-${k}" name="${k}" class="form-control" maxlength="${max}" value="${esc(p[k] || '')}" required></div>`).join('')}
+        <div class="form-group span-2"><label><input type="checkbox" name="annuaire" ${p.annuaire === false ? '' : 'checked'}> Visible dans l'annuaire public</label></div>
+        <p class="form-error span-2" role="alert" hidden></p>
+        <div class="pg-cta span-2"><button class="btn btn--primary" type="submit">Enregistrer</button><button class="btn btn--ghost" type="button" data-cancel>Annuler</button></div>
+      </form>`;
+    const f = $('form', box), err = $('.form-error', box);
+    $('[data-cancel]', box).addEventListener('click', () => { box.hidden = true; });
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {};
+      for (const [k, l, max] of fields) {
+        const v = f[k].value.trim().slice(0, max);
+        if (v.length < (k === 'whatsapp' ? 6 : 2)) return show(err, `Vérifiez le champ « ${l} ».`);
+        data[k] = v;
+      }
+      data.annuaire = f.annuaire.checked;
+      const btn = f.querySelector('button[type=submit]');
+      show(err, ''); busy(btn, true, 'Enregistrement…');
+      try {
+        await updateDoc(doc(db, 'ambassadors', p.id), { ...data, updatedAt: serverTimestamp() });
+        Object.assign(p, data);
+        renderCandidates(pane, filter);
+      } catch (ex) { show(err, errText(ex)); busy(btn, false); }
+    });
   }
 
   async function renderDetail(box, p) {
     box.hidden = false;
+    box.dataset.mode = 'manage';
     box.innerHTML = '<p class="amb-empty">Chargement…</p>';
     try {
       const [rs, ps, cs, vs] = await Promise.all([

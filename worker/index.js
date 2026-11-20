@@ -5,7 +5,8 @@
             /admin (actions admin, jeton Firebase),
             /apply-ack (accusé de réception de candidature par e-mail, jeton Firebase),
             /verify-email (lien de confirmation d'adresse, jeton Firebase),
-            /reset-password (lien de nouveau mot de passe, public).
+            /reset-password (lien de nouveau mot de passe, public),
+            /delete-account (suppression de son propre compte, connexion récente exigée).
    Les e-mails partent via Resend avec la mise en page de worker/mail.js.
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
@@ -17,7 +18,7 @@ const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
 const API_BASE = `https://firestore.googleapis.com/v1/${DOC_ROOT}`;
 const ALLOWED_ORIGINS = ['https://ambassadeurs.unusuall.online', 'http://127.0.0.1:8123', 'http://localhost:8123'];
 const CONTINUE_URL = 'https://ambassadeurs.unusuall.online/espace.html';
-const CORS_PATHS = ['/admin', '/apply-ack', '/verify-email', '/reset-password'];
+const CORS_PATHS = ['/admin', '/apply-ack', '/verify-email', '/reset-password', '/delete-account'];
 const corsFor = (request) => {
   const origin = request.headers.get('Origin') || '';
   return ALLOWED_ORIGINS.includes(origin)
@@ -140,6 +141,18 @@ class Firestore {
     if (r.ok && !r.data.oobLink) return null;
     if (!r.ok) throw new Error('Lien Firebase impossible : ' + (r.msg || `HTTP ${r.status}`));
     return r.data.oobLink;
+  }
+  /* Supprime le compte de connexion (Firebase Auth). Déjà absent = succès. */
+  async deleteAuthUser(uid) {
+    const token = await this.accessToken('https://www.googleapis.com/auth/cloud-platform');
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:delete`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId: uid })
+    });
+    const data = await res.json().catch(() => ({}));
+    const msg = String(data.error?.message || '');
+    if (!res.ok && !/USER_NOT_FOUND|EMAIL_NOT_FOUND/i.test(msg)) throw new Error('Suppression du compte impossible : ' + (msg || `HTTP ${res.status}`));
   }
   async call(path, method = 'GET', body) {
     const token = await this.accessToken();
@@ -732,6 +745,89 @@ async function notifyDecision(fs, env, body, origin) {
   return { ok: true, sent: true };
 }
 
+/* ───────── Suppression de compte ───────── */
+const SUBCOLLECTIONS = ['restaurants', 'payments', 'commissions', 'payouts', 'clients'];
+
+/* Commissions pas encore versées (en attente ou payables, non annulées). */
+async function unpaidTotal(fs, uid) {
+  const docs = await fs.query('commissions', { parent: `ambassadors/${uid}` });
+  return docs.map((d) => decFields(d.fields))
+    .filter((c) => (c.statut === 'pending' || c.statut === 'payable') && Number(c.montant) > 0)
+    .reduce((t, c) => t + Number(c.montant), 0);
+}
+
+/* Efface la fiche, ses sous-collections, les index d'attribution (les
+   prochains événements Epicure de ses restaurants seront ignorés), les journaux
+   d'e-mails, puis le compte de connexion. */
+async function purgeAccount(fs, uid) {
+  const rest = [];
+  for (const sub of SUBCOLLECTIONS) {
+    (await fs.query(sub, { parent: `ambassadors/${uid}` })).forEach((d) => rest.push(d.name));
+  }
+  for (const idx of ['restaurantIndex', 'paymentIndex']) {
+    (await fs.query(idx, { where: eq('ambassadorUid', uid) })).forEach((d) => rest.push(d.name));
+  }
+  rest.push(docName(`mailLog/${uid}`), docName(`verifyLog/${uid}`),
+    docName(`decisionLog/${uid}_approved`), docName(`decisionLog/${uid}_rejected`));
+  for (let i = 0; i < rest.length; i += 400) {
+    await fs.commit(rest.slice(i, i + 400).map((name) => ({ delete: name })));
+  }
+  /* Fiche en dernier : si une étape échoue, la suppression peut être relancée. */
+  await fs.commit([{ delete: docName(`ambassadors/${uid}`) }]);
+  await fs.deleteAuthUser(uid);
+  return { ok: true, deleted: rest.length + 1 };
+}
+
+/* Un compte administrateur ne se supprime pas par ce biais. */
+async function assertNotAdmin(fs, uid) {
+  if (await fs.getDoc(`admins/${uid}`)) throw httpErr(403, 'permission-denied', 'Un compte administrateur ne peut pas être supprimé ici.');
+}
+
+async function adminDeleteAccount(fs, body, adminUid) {
+  const uid = str(body.ambassadorUid);
+  if (!uid) throw httpErr(400, 'invalid-argument', 'ambassadorUid est requis.');
+  if (uid === adminUid) throw httpErr(403, 'permission-denied', 'Vous ne pouvez pas supprimer votre propre compte administrateur.');
+  await assertNotAdmin(fs, uid);
+  const unpaid = await unpaidTotal(fs, uid);
+  if (unpaid > 0 && body.force !== true) {
+    throw Object.assign(httpErr(409, 'failed-precondition', `Cet ambassadeur a ${Math.round(unpaid).toLocaleString('fr-FR')} FCFA de commissions non versées.`), { unpaid });
+  }
+  return purgeAccount(fs, uid);
+}
+
+/* Lien de nouveau mot de passe envoyé par l'administration à l'ambassadeur. */
+async function adminSendReset(fs, env, body) {
+  const uid = str(body.ambassadorUid);
+  if (!uid) throw httpErr(400, 'invalid-argument', 'ambassadorUid est requis.');
+  const a = await fs.data(`ambassadors/${uid}`);
+  if (!a || !str(a.email)) throw httpErr(404, 'not-found', "Aucune adresse e-mail sur cette fiche.");
+  const email = str(a.email).toLowerCase();
+  await throttle(fs, `resetLog/${await sha256Hex(email)}`, 'lastAt');
+  const link = await fs.oobLink('PASSWORD_RESET', email);
+  if (!link) throw httpErr(404, 'not-found', 'Aucun compte de connexion pour cette adresse.');
+  await sendMail(env, { to: email, ...passwordReset({ link }) });
+  return { ok: true, to: email };
+}
+
+/* L'ambassadeur supprime lui-même son compte : connexion de moins de 5 minutes exigée. */
+async function deleteAccountRoute(request, fs) {
+  const cors = corsFor(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  const claims = await verifyIdTokenClaims((request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+  if (Math.floor(Date.now() / 1000) - (Number(claims.auth_time) || 0) > 300) {
+    throw httpErr(401, 'unauthenticated', 'Confirmez votre mot de passe pour supprimer le compte.');
+  }
+  let body = {};
+  try { body = await request.json(); } catch { /* corps facultatif */ }
+  await assertNotAdmin(fs, claims.sub);
+  const unpaid = await unpaidTotal(fs, claims.sub);
+  if (unpaid > 0 && body.force !== true) {
+    return json({ error: 'Des commissions ne vous ont pas encore été versées.', code: 'failed-precondition', unpaid }, 409, cors);
+  }
+  return json(await purgeAccount(fs, claims.sub), 200, cors);
+}
+
 async function admin(request, env, fs) {
   const origin = request.headers.get('Origin') || '';
   const cors = ALLOWED_ORIGINS.includes(origin)
@@ -746,6 +842,11 @@ async function admin(request, env, fs) {
   try { body = await request.json(); } catch { throw httpErr(400, 'invalid-argument', 'Corps JSON invalide.'); }
   if (body.action === 'markPaid') return json(await markPaid(fs, body), 200, cors);
   if (body.action === 'correctAttribution') return json(await correctAttribution(fs, body), 200, cors);
+  if (body.action === 'deleteAccount') {
+    try { return json(await adminDeleteAccount(fs, body, uid), 200, cors); }
+    catch (e) { if (e.unpaid) return json({ error: e.message, code: e.code, unpaid: e.unpaid }, e.status, cors); throw e; }
+  }
+  if (body.action === 'sendReset') return json(await adminSendReset(fs, env, body), 200, cors);
   if (body.action === 'notifyDecision') return json(await notifyDecision(fs, env, body, new URL(request.url).origin), 200, cors);
   return json({ error: 'unknown_action' }, 400, cors);
 }
@@ -843,6 +944,7 @@ export default {
       if (url.pathname === '/apply-ack') return await applyAck(request, env, fs);
       if (url.pathname === '/verify-email') return await verifyEmailRoute(request, env, fs);
       if (url.pathname === '/reset-password') return await resetPasswordRoute(request, env, fs);
+      if (url.pathname === '/delete-account') return await deleteAccountRoute(request, fs);
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });
       return json({ error: 'not_found' }, 404);
     } catch (err) {
