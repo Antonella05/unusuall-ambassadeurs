@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://ambassadeurs.unusuall.online';
-const V = '19';
+const V = '21';
 
 const ICON = {
   home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>',
@@ -137,12 +137,14 @@ ${body}
           </div>
           <div class="app-footer__col">
             <h4>Programme</h4>
-            <a href="produits.html">Produits</a>
-            <a href="gains.html">Gains</a>
-            <a href="avantages.html">Avantages</a>
-            <a href="annuaire.html">Annuaire</a>
-            <a href="reglement.html">Règlement</a>
-            <a href="postuler.html">Postuler</a>
+            <div class="app-footer__links">
+              <a href="produits.html">Produits</a>
+              <a href="gains.html">Gains</a>
+              <a href="avantages.html">Avantages</a>
+              <a href="annuaire.html">Annuaire</a>
+              <a href="reglement.html">Règlement</a>
+              <a href="postuler.html">Postuler</a>
+            </div>
           </div>
           <div class="app-footer__col">
             <h4>Contact</h4>${SOCIAL}

@@ -671,3 +671,6 @@
   .news-panel, .news-panel.is-open { transition: none; transform: none; }
   .news-btn.has-unread .news-btn__dot, .news-btn.has-unread svg { animation: none; }
 }
+
+/* Pied de page : les 6 liens « Programme » sur deux colonnes de 3 */
+.app-footer__links { display: grid; grid-template-columns: repeat(2, max-content); grid-template-rows: repeat(3, auto); grid-auto-flow: column; column-gap: 40px; }
