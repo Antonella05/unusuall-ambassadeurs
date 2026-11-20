@@ -829,26 +829,6 @@
         en: 'Features, pricing and demos of Epicure and our suites: everything to present what you represent.'
       },
       link: { href: 'https://unusuall.online/', fr: 'Visiter unusuall.online', en: 'Visit unusuall.online', external: true }
-    },
-    {
-      id: 'commissions-annuelles-2026-11',
-      tag: { fr: 'Nouveau', en: 'New' },
-      title: { fr: 'Commissions renouvelées chaque année', en: 'Commissions renewed every year' },
-      text: {
-        fr: 'Le 13e mois de chaque client rapporte de nouveau 30 %, puis 10 % les autres mois, tant qu’il reste abonné.',
-        en: 'Each customer’s 13th month pays 30 % again, then 10 % the other months, as long as they stay subscribed.'
-      },
-      link: { href: 'gains.html', fr: 'Voir mes gains possibles', en: 'See possible earnings' }
-    },
-    {
-      id: 'reglement-2026-11',
-      tag: { fr: 'Important', en: 'Important' },
-      title: { fr: 'Le règlement du programme', en: 'The program rules' },
-      text: {
-        fr: 'Paiements sans minimum et sans frais, attribution des clients, fin du partenariat : tout est écrit.',
-        en: 'Payments with no minimum and no fees, customer attribution, end of partnership: it is all written down.'
-      },
-      link: { href: 'reglement.html', fr: 'Lire le règlement', en: 'Read the rules' }
     }
   ];
 
