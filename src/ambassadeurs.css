@@ -702,3 +702,21 @@
 
 /* Pied de page : les 6 liens « Programme » sur deux colonnes de 3 */
 .app-footer__links { display: grid; grid-template-columns: repeat(2, max-content); grid-template-rows: repeat(3, auto); grid-auto-flow: column; column-gap: 40px; }
+
+/* Pied de page sur téléphone : version compacte
+   (logo + mentions sur une ligne, Programme en 2 colonnes, Contact et réseaux côte à côte) */
+@media (max-width: 639px) {
+  .app-footer__grid { grid-template-columns: max-content max-content; justify-content: space-between; gap: 18px 12px; }
+  .app-footer__brand, .app-footer__col:nth-child(2) { grid-column: 1 / -1; }
+  .app-footer__brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-footer__brand p { display: none; }
+  .app-footer__legal { margin-top: 0; }
+  .app-footer__col h4 { margin-bottom: 6px; }
+  .app-footer__col a { padding: 3px 0; }
+  .app-footer__col .app-footer__social { font-size: 12.5px; white-space: nowrap; }
+}
+/* Très petits écrans : Contact et réseaux l'un sous l'autre */
+@media (max-width: 349px) {
+  .app-footer__grid { grid-template-columns: 1fr; }
+  .app-footer__col-spacer { display: none; }
+}
