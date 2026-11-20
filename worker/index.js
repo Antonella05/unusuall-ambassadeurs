@@ -2,10 +2,12 @@
    Routes : /go (redirection + clic), /qr (SVG), /search (recherche publique),
             /directory (annuaire public), /webhook (événements Epicure, secret),
             dont restaurant.cancelled (résiliation),
-            /admin (actions admin, jeton Firebase).
+            /admin (actions admin, jeton Firebase),
+            /apply-ack (accusé de réception de candidature par e-mail, jeton Firebase).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
+import { applicationAck, sendMail } from './mail.js';
 
 const PROJECT = 'unusuall-ambassadeurs';
 const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
@@ -547,7 +549,7 @@ function pemToSpki(pem) {
   return der.slice(p, p + tlv(der, p).total);
 }
 
-async function verifyIdToken(token) {
+async function verifyIdTokenClaims(token) {
   const bad = () => httpErr(401, 'unauthenticated', 'Session expirée. Reconnectez-vous.');
   if (!token) throw bad();
   const [h, p, s] = token.split('.');
@@ -571,8 +573,9 @@ async function verifyIdToken(token) {
   if (!ok) throw bad();
   const now = Math.floor(Date.now() / 1000);
   if (claims.aud !== PROJECT || claims.iss !== `https://securetoken.google.com/${PROJECT}` || !claims.sub || claims.exp <= now) throw bad();
-  return claims.sub;
+  return claims;
 }
+const verifyIdToken = async (token) => (await verifyIdTokenClaims(token)).sub;
 
 async function markPaid(fs, body) {
   const ambassadorUid = str(body.ambassadorUid);
@@ -675,12 +678,43 @@ async function admin(request, env, fs) {
   return json({ error: 'unknown_action' }, 400, cors);
 }
 
+/* Accusé de réception envoyé au candidat, une seule fois par compte :
+   mailLog/{uid} est créé avant l'envoi (création conditionnelle = pas de doublon). */
+async function applyAck(request, env, fs) {
+  const origin = request.headers.get('Origin') || '';
+  const cors = ALLOWED_ORIGINS.includes(origin)
+    ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' }
+    : {};
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  const claims = await verifyIdTokenClaims((request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
+  if (!claims.email || claims.email_verified !== true) throw httpErr(403, 'permission-denied', 'Adresse e-mail non confirmée.');
+  const a = await fs.data(`ambassadors/${claims.sub}`);
+  if (!a) throw httpErr(404, 'not-found', 'Aucune candidature pour ce compte.');
+  if (a.status !== 'pending') return json({ ok: true, skipped: true }, 200, cors);
+  const log = docName(`mailLog/${claims.sub}`);
+  try {
+    await fs.commit([{ update: { name: log, fields: encFields({ applicationAckAt: new Date(), to: claims.email }) }, currentDocument: { exists: false } }]);
+  } catch (e) {
+    if (isDuplicate(e)) return json({ ok: true, already: true }, 200, cors);
+    throw e;
+  }
+  try {
+    await sendMail(env, { to: claims.email, ...applicationAck({ nom: a.nom, ville: a.ville }) });
+  } catch (e) {
+    console.error('[apply-ack]', e.message);
+    await fs.commit([{ delete: log }]).catch(() => {});
+    throw httpErr(502, 'mail-failed', "L'e-mail de confirmation n'a pas pu être envoyé.");
+  }
+  return json({ ok: true }, 200, cors);
+}
+
 /* ───────── Point d'entrée ───────── */
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
-    const cors = url.pathname === '/admin' && ALLOWED_ORIGINS.includes(origin)
+    const cors = (url.pathname === '/admin' || url.pathname === '/apply-ack') && ALLOWED_ORIGINS.includes(origin)
       ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' }
       : {};
     try {
@@ -691,6 +725,7 @@ export default {
       if (url.pathname === '/directory') return await directory(url, fs);
       if (url.pathname === '/webhook') return await webhook(request, env, fs);
       if (url.pathname === '/admin') return await admin(request, env, fs);
+      if (url.pathname === '/apply-ack') return await applyAck(request, env, fs);
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });
       return json({ error: 'not_found' }, 404);
     } catch (err) {

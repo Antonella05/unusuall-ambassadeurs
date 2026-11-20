@@ -397,6 +397,10 @@ if (PAGE === 'space') {
         mail.append('reseau', data.reseau.join(', '));
         mail.append('produits', data.produits.concat(data.produitsFuturs.map((p) => p + ' (à l\'ouverture)')).join(', '));
         fetch(FORMSPREE, { method: 'POST', body: mail, headers: { Accept: 'application/json' } }).catch(() => {});
+        // Accusé de réception envoyé au candidat par le Worker (non bloquant)
+        user.getIdToken()
+          .then((t) => fetch(`${FUNCTIONS_ORIGIN}/apply-ack`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } }))
+          .catch((ex) => console.error('[accusé de réception]', ex));
         form.hidden = true;
         root.innerHTML = statusCard({ ...data, createdAt: new Date() });
       } catch (ex) {
