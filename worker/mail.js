@@ -5,6 +5,7 @@
    decisionApproved / decisionRejected : réponse à la candidature. */
 
 const SITE = 'https://ambassadeurs.unusuall.online';
+const WHATSAPP_GROUP = 'https://chat.whatsapp.com/Iq3EsQlbvzS7yzqseZZ13F';
 const LOGO = `${SITE}/assets/img/icon-192-mark.png`;
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -177,6 +178,13 @@ ${step(1, 'Partagez votre lien ou votre QR code aux restaurants autour de vous.'
 ${step(2, 'Le restaurant s\'inscrit sur Epicure avec votre lien&nbsp;: il vous est attribué automatiquement.')}
 ${step(3, `Vous touchez <b>${firstPct}&nbsp;%</b> de son 1er mois payé, puis <b>${recurringPct}&nbsp;%</b> de chaque mois suivant, versés le ${paymentDay} de chaque mois sur Mobile Money.`)}
         </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;background:#fff8e6;border:1px solid #f0d98a;border-radius:16px;">
+          <tr><td style="padding:18px 22px;">
+            <p style="margin:0 0 6px;font-size:16px;font-weight:800;color:#0d2818;">Dernière étape&nbsp;: rejoignez le groupe WhatsApp</p>
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#0d2818;">Vous devez rejoindre le <b>groupe WhatsApp des ambassadeurs</b> pour recevoir les informations importantes et échanger avec l'équipe et les autres ambassadeurs&nbsp;: <a href="${WHATSAPP_GROUP}" style="color:#1a472a;font-weight:700;">rejoindre le groupe</a>.</p>
+          </td></tr>
+        </table>
 ${button(`${SITE}/espace.html`, 'Ouvrir mon espace')}
         <p style="margin:0;font-size:14px;line-height:1.6;color:#5a7260;">Votre QR code, vos restaurants et vos gains sont dans votre espace. Avant de commencer, prenez deux minutes pour relire <a href="${SITE}/reglement.html" style="color:#1a472a;font-weight:600;">les règles du programme</a>.</p>`
   });
@@ -189,6 +197,7 @@ ${button(`${SITE}/espace.html`, 'Ouvrir mon espace')}
     '1. Partagez votre lien ou votre QR code aux restaurants autour de vous.',
     "2. Le restaurant s'inscrit sur Epicure avec votre lien : il vous est attribué automatiquement.",
     `3. Vous touchez ${firstPct} % de son 1er mois payé, puis ${recurringPct} % de chaque mois suivant, versés le ${paymentDay} de chaque mois sur Mobile Money.`, '',
+    `Dernière étape : vous devez rejoindre le groupe WhatsApp des ambassadeurs : ${WHATSAPP_GROUP}`, '',
     `Votre espace (QR code, restaurants, gains) : ${SITE}/espace.html`,
     `Les règles du programme : ${SITE}/reglement.html`,
     ...SIGNATURE
