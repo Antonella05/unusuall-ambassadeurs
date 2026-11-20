@@ -595,9 +595,12 @@ if (PAGE === 'admin') {
   async function renderOverview(pane) {
     pane.innerHTML = '<p class="amb-empty">Chargement…</p>';
     try {
-      const [rsnap, csnap] = await Promise.all([getDocs(collectionGroup(db, 'restaurants')), getDocs(collectionGroup(db, 'commissions'))]);
-      const rests = rsnap.docs.map((d) => d.data());
-      const comms = csnap.docs.map((d) => d.data());
+      /* Restaurants et commissions : si leur lecture échoue, on affiche quand même
+         tout ce qui vient des candidatures, avec un avertissement. */
+      let partial = false;
+      const safeGroup = (name) => getDocs(collectionGroup(db, name)).then((s) => s.docs.map((d) => d.data()))
+        .catch((ex) => { console.error(`[vue d'ensemble] ${name}`, ex); partial = true; return []; });
+      const [rests, comms] = await Promise.all([safeGroup('restaurants'), safeGroup('commissions')]);
       const now = Date.now();
       const pending = people.filter((p) => p.status === 'pending');
       const late = pending.filter((p) => createdMs(p) && now - createdMs(p) > HOURS_72);
@@ -624,6 +627,7 @@ if (PAGE === 'admin') {
       const max = Math.max(1, ...cities.map((g) => g.active + g.pending));
 
       pane.innerHTML = `
+        ${partial ? '<p class="form-error">Les restaurants et les commissions n’ont pas pu être chargés (règles Firestore à publier). Les chiffres des candidatures ci-dessous sont à jour.</p>' : ''}
         ${pending.length ? `<div class="amb-alert ${late.length ? 'is-late' : ''}">
           <p><b>${pending.length} candidature${pending.length > 1 ? 's' : ''} en attente</b>${late.length ? ` dont <b>${late.length}</b> depuis plus de 72 heures (le délai annoncé aux candidats)` : ''}.</p>
           <button type="button" class="btn btn--primary" data-go="candidates">Traiter les candidatures</button>

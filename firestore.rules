@@ -85,5 +85,14 @@ service cloud.firestore {
         allow write: if (sub == 'clients' || sub == 'payouts') && isAdmin();
       }
     }
+
+    // Requêtes « collection group » de l'administration (vue d'ensemble, suivi
+    // des liens, récapitulatif) : lecture de tous les restaurants / commissions.
+    match /{path=**}/restaurants/{docId} {
+      allow read: if isAdmin();
+    }
+    match /{path=**}/commissions/{docId} {
+      allow read: if isAdmin();
+    }
   }
 }
