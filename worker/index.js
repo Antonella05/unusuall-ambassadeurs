@@ -7,7 +7,8 @@
             /verify-email (lien de confirmation d'adresse, jeton Firebase),
             /reset-password (lien de nouveau mot de passe, public),
             /delete-account (suppression de son propre compte, connexion récente exigée).
-   Les e-mails partent via Resend avec la mise en page de worker/mail.js.
+   Les e-mails partent via Resend avec la mise en page de worker/mail.js ;
+   chaque envoi est noté dans la collection emailLog (page admin « E-mails envoyés »).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
@@ -179,8 +180,8 @@ class Firestore {
     return d ? decFields(d.fields) : null;
   }
   commit(writes) { return this.call(':commit', 'POST', { writes }); }
-  async query(collectionId, { where, limit, parent = '' } = {}) {
-    const structuredQuery = { from: [{ collectionId }], ...(where ? { where } : {}), ...(limit ? { limit } : {}) };
+  async query(collectionId, { where, orderBy, limit, parent = '' } = {}) {
+    const structuredQuery = { from: [{ collectionId }], ...(where ? { where } : {}), ...(orderBy ? { orderBy } : {}), ...(limit ? { limit } : {}) };
     const path = parent ? `/${parent}:runQuery` : ':runQuery';
     const rows = await this.call(path, 'POST', { structuredQuery });
     return (rows || []).filter((r) => r.document).map((r) => r.document);
@@ -709,6 +710,34 @@ async function correctAttribution(fs, body) {
   return { ok: true, moved: payments.length + commissions.length };
 }
 
+/* ───────── Journal des e-mails ───────── */
+const EMAIL_LOG_LIMIT = 500;
+
+/* Envoie un e-mail et note le résultat dans emailLog. On n'enregistre ni le
+   contenu ni les liens (ils donnent accès au compte). Une panne du journal ne
+   doit jamais bloquer ni faire échouer un envoi. */
+async function sendLogged(fs, env, { type, to, uid = '' }, mail) {
+  const record = (status, extra) => fs.commit([{
+    update: { name: docName(`emailLog/${crypto.randomUUID()}`), fields: encFields({ sentAt: new Date(), type, to: to.toLowerCase(), uid, subject: mail.subject, status, ...extra }) },
+    currentDocument: { exists: false }
+  }]).catch((e) => console.error('[emailLog]', e.message));
+  let result;
+  try {
+    result = await sendMail(env, { to, ...mail });
+  } catch (e) {
+    await record('failed', { error: String(e.message).slice(0, 300) });
+    throw e;
+  }
+  await record('sent', { resendId: str(result?.id) });
+  return result;
+}
+
+/* Les envois les plus récents, pour la page admin. */
+async function listEmails(fs) {
+  const docs = await fs.query('emailLog', { orderBy: [{ field: { fieldPath: 'sentAt' }, direction: 'DESCENDING' }], limit: EMAIL_LOG_LIMIT });
+  return { ok: true, emails: docs.map((d) => decFields(d.fields)), limit: EMAIL_LOG_LIMIT };
+}
+
 /* E-mail de décision (validée / refusée), une seule fois par statut et par compte. */
 async function notifyDecision(fs, env, body, origin) {
   const uid = str(body.ambassadorUid);
@@ -736,7 +765,7 @@ async function notifyDecision(fs, env, body, origin) {
     throw e;
   }
   try {
-    await sendMail(env, { to: a.email, ...mail });
+    await sendLogged(fs, env, { type: a.status, to: a.email, uid }, mail);
   } catch (e) {
     console.error('[notifyDecision]', e.message);
     await fs.commit([{ delete: log }]).catch(() => {});
@@ -761,6 +790,12 @@ async function unpaidTotal(fs, uid) {
    d'e-mails, puis le compte de connexion. */
 async function purgeAccount(fs, uid) {
   const rest = [];
+  /* Journal des e-mails : par compte, et par adresse (les demandes publiques de
+     mot de passe ne portent pas d'uid). */
+  const email = str((await fs.data(`ambassadors/${uid}`))?.email).toLowerCase();
+  const logs = await fs.query('emailLog', { where: eq('uid', uid) });
+  if (email) logs.push(...await fs.query('emailLog', { where: eq('to', email) }));
+  rest.push(...new Set(logs.map((d) => d.name)));
   for (const sub of SUBCOLLECTIONS) {
     (await fs.query(sub, { parent: `ambassadors/${uid}` })).forEach((d) => rest.push(d.name));
   }
@@ -805,7 +840,7 @@ async function adminSendReset(fs, env, body) {
   await throttle(fs, `resetLog/${await sha256Hex(email)}`, 'lastAt');
   const link = await fs.oobLink('PASSWORD_RESET', email);
   if (!link) throw httpErr(404, 'not-found', 'Aucun compte de connexion pour cette adresse.');
-  await sendMail(env, { to: email, ...passwordReset({ link }) });
+  await sendLogged(fs, env, { type: 'reset', to: email, uid }, passwordReset({ link }));
   return { ok: true, to: email };
 }
 
@@ -847,6 +882,7 @@ async function admin(request, env, fs) {
     catch (e) { if (e.unpaid) return json({ error: e.message, code: e.code, unpaid: e.unpaid }, e.status, cors); throw e; }
   }
   if (body.action === 'sendReset') return json(await adminSendReset(fs, env, body), 200, cors);
+  if (body.action === 'listEmails') return json(await listEmails(fs), 200, cors);
   if (body.action === 'notifyDecision') return json(await notifyDecision(fs, env, body, new URL(request.url).origin), 200, cors);
   return json({ error: 'unknown_action' }, 400, cors);
 }
@@ -873,7 +909,7 @@ async function applyAck(request, env, fs) {
     throw e;
   }
   try {
-    await sendMail(env, { to: claims.email, ...applicationAck({ nom: a.nom, ville: a.ville }) });
+    await sendLogged(fs, env, { type: 'ack', to: claims.email, uid: claims.sub }, applicationAck({ nom: a.nom, ville: a.ville }));
   } catch (e) {
     console.error('[apply-ack]', e.message);
     await fs.commit([{ delete: log }]).catch(() => {});
@@ -906,7 +942,7 @@ async function verifyEmailRoute(request, env, fs) {
   await throttle(fs, `verifyLog/${claims.sub}`, 'lastAt');
   const link = await fs.oobLink('VERIFY_EMAIL', claims.email);
   if (!link) throw httpErr(404, 'not-found', 'Compte introuvable.');
-  await sendMail(env, { to: claims.email, ...verifyEmail({ nom: claims.name, link }) });
+  await sendLogged(fs, env, { type: 'verify', to: claims.email, uid: claims.sub }, verifyEmail({ nom: claims.name, link }));
   return json({ ok: true }, 200, cors);
 }
 
@@ -921,7 +957,7 @@ async function resetPasswordRoute(request, env, fs) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw httpErr(400, 'invalid-argument', 'Adresse e-mail invalide.');
   await throttle(fs, `resetLog/${await sha256Hex(email)}`, 'lastAt');
   const link = await fs.oobLink('PASSWORD_RESET', email);
-  if (link) await sendMail(env, { to: email, ...passwordReset({ link }) });
+  if (link) await sendLogged(fs, env, { type: 'reset', to: email }, passwordReset({ link }));
   return json({ ok: true }, 200, cors);
 }
 

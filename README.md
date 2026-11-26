@@ -47,7 +47,7 @@ Projet Firebase : `unusuall-ambassadeurs` (formule gratuite Spark), base Firesto
 
 - `connexion.html` : connexion, création de compte (e-mail et mot de passe), mot de passe oublié.
 - `espace.html` : candidature, puis statut ; une fois validé, code ambassadeur, clients, gains et versements.
-- `admin.html` (non référencée) : valider ou refuser les candidatures, attribuer les codes, ajouter les clients, compter les mois payés, enregistrer les versements.
+- `admin.html` (non référencée) : valider ou refuser les candidatures, attribuer les codes, ajouter les clients, compter les mois payés, enregistrer les versements ; l’onglet « E-mails envoyés » liste les envois notés par le Worker (collection `emailLog`, lue uniquement via le Worker).
 - `assets/js/account.js` : tout le code des comptes. Firebase n'est chargé que sur ces trois pages.
 - `firestore.rules` : règles de sécurité, à recopier dans la console (Firestore → Règles → Publier) après toute modification.
 

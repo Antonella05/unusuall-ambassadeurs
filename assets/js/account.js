@@ -1,7 +1,8 @@
 /* UNUSUALL Ambassadeurs — comptes (Firebase Auth + Firestore + Functions)
    Pages : connexion.html (login/inscription/mot de passe oublié),
            espace.html (candidature, statut, tableau de bord, lien et QR code),
-           admin.html (candidatures, suivi des liens, récapitulatif, réglages). */
+           admin.html (candidatures, suivi des liens, récapitulatif,
+           e-mails envoyés, réglages). */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -632,7 +633,7 @@ if (PAGE === 'admin') {
   }
 
   function renderMain(tab) {
-    const tabs = [['overview', 'Vue d’ensemble'], ['candidates', 'Candidatures'], ['links', 'Suivi des liens'], ['recap', 'Récapitulatif'], ['settings', 'Réglages']];
+    const tabs = [['overview', 'Vue d’ensemble'], ['candidates', 'Candidatures'], ['links', 'Suivi des liens'], ['recap', 'Récapitulatif'], ['emails', 'E-mails envoyés'], ['settings', 'Réglages']];
     root.innerHTML = `
       <div class="amb-tabs amb-main-tabs" role="tablist">
         ${tabs.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}">${l}</button>`).join('')}
@@ -644,6 +645,7 @@ if (PAGE === 'admin') {
     else if (tab === 'candidates') renderCandidates(pane, 'pending');
     else if (tab === 'links') renderLinks(pane);
     else if (tab === 'recap') renderRecap(pane);
+    else if (tab === 'emails') renderEmails(pane);
     else renderSettings(pane);
   }
 
@@ -718,6 +720,82 @@ if (PAGE === 'admin') {
         if (g && !g.pending && g.active) renderCandidates($('#admin-pane'), 'approved');
       }));
     } catch (ex) { pane.innerHTML = `<p class="form-error">${esc(errText(ex))}</p>`; }
+  }
+
+  /* ── E-mails envoyés (journal tenu par le Worker) ── */
+  const EMAIL_TYPES = { verify: 'Confirmation d’adresse', ack: 'Candidature reçue', approved: 'Candidature validée', rejected: 'Candidature refusée', reset: 'Mot de passe' };
+  const dateTimeFr = (t) => (t ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+
+  async function renderEmails(pane) {
+    /* Conteneur propre à cet affichage : si l'admin change d'onglet pendant le
+       chargement, la réponse tardive ne remplace pas la page ouverte entre-temps. */
+    pane.innerHTML = '<div><p class="amb-empty">Chargement…</p></div>';
+    const box = pane.firstElementChild;
+    let emails, limit;
+    try {
+      ({ emails, limit } = await adminCall('listEmails'));
+    } catch (ex) {
+      console.error('[e-mails envoyés]', ex);
+      box.innerHTML = '<p class="form-error">Le journal des e-mails n’a pas pu être chargé. Réessayez dans un instant.</p>';
+      return;
+    }
+    if (!box.isConnected) return;
+    const byUid = new Map(people.map((p) => [p.id, p.nom]));
+    const byEmail = new Map(people.map((p) => [String(p.email || '').toLowerCase(), p.nom]));
+    const rows = emails.map((m) => ({ ...m, nom: byUid.get(m.uid) || byEmail.get(m.to) || '', typeLabel: EMAIL_TYPES[m.type] || m.type }));
+    const opt = ([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`;
+    box.innerHTML = `
+      <div class="amb-toolbar">
+        <input type="search" id="m-text" class="form-control amb-toolbar__search" placeholder="Rechercher : nom ou e-mail…" aria-label="Rechercher un e-mail envoyé">
+        <select id="m-type" class="form-control" aria-label="Filtrer par type">${[['', 'Tous les types'], ...Object.entries(EMAIL_TYPES)].map(opt).join('')}</select>
+        <select id="m-status" class="form-control" aria-label="Filtrer par résultat">${[['', 'Tous les résultats'], ['sent', 'Partis'], ['failed', 'Échecs']].map(opt).join('')}</select>
+        <button type="button" class="btn btn--ghost" id="m-export">Exporter (CSV)</button>
+        <button type="button" class="btn btn--ghost" id="m-refresh">Actualiser</button>
+      </div>
+      <p class="amb-hint" aria-live="polite" id="m-count"></p>
+      <div id="m-list"></div>
+      <p class="amb-hint">« Parti » : Resend a accepté l’e-mail. Sa réception (délivré ou rejeté) se vérifie sur <a href="https://resend.com/emails" target="_blank" rel="noopener">resend.com ↗</a>. Le journal commence à sa mise en service${rows.length >= limit ? ` ; seuls les ${limit} envois les plus récents sont affichés` : ''}. Les e-mails de secours envoyés par Firebase n’y figurent pas.</p>`;
+
+    let current = rows;
+    const draw = () => {
+      const t = foldKey($('#m-text', box).value);
+      const type = $('#m-type', box).value;
+      const status = $('#m-status', box).value;
+      current = rows.filter((m) => (!t || foldKey(`${m.nom} ${m.to}`).includes(t)) && (!type || m.type === type) && (!status || m.status === status));
+      const failed = current.filter((m) => m.status === 'failed').length;
+      $('#m-count', box).textContent = `${current.length} e-mail${current.length > 1 ? 's' : ''}${failed ? `, dont ${failed} en échec` : ''}.`;
+      $('#m-export', box).disabled = !current.length;
+      $('#m-list', box).innerHTML = current.length ? `<div class="amb-table"><table>
+        <thead><tr><th scope="col">Destinataire</th><th scope="col">E-mail</th><th scope="col">Date</th><th scope="col">Résultat</th></tr></thead>
+        <tbody>${current.map((m) => `<tr>
+          <th scope="row">${m.nom ? `${esc(m.nom)}<br>` : ''}<small>${esc(m.to)}</small></th>
+          <td title="${esc(m.subject)}">${esc(m.typeLabel)}</td>
+          <td>${esc(dateTimeFr(m.sentAt))}</td>
+          <td><em class="amb-state ${m.status === 'sent' ? 'amb-state--approved' : 'amb-state--rejected'}"${m.error ? ` title="${esc(m.error)}"` : ''}>${m.status === 'sent' ? 'Parti' : 'Échec'}</em></td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : `<p class="amb-empty">${rows.length ? 'Aucun e-mail ne correspond à ces filtres.' : 'Aucun e-mail enregistré pour le moment.'}</p>`;
+    };
+    draw();
+    $('#m-text', box).addEventListener('input', draw);
+    $('#m-type', box).addEventListener('change', draw);
+    $('#m-status', box).addEventListener('change', draw);
+    $('#m-refresh', box).addEventListener('click', () => renderEmails(pane));
+    $('#m-export', box).addEventListener('click', () => exportEmails(current));
+  }
+
+  function exportEmails(list) {
+    /* Cellules commençant par = + - @ neutralisées (formules dans un tableur). */
+    const cell = (v) => `"${String(v ?? '').replace(/^(?=[=+\-@])/, "'").replace(/"/g, '""')}"`;
+    const lines = [['Date', 'Nom', 'E-mail', 'Type', 'Objet', 'Résultat', 'Erreur'].map(cell).join(';')];
+    for (const m of list) {
+      lines.push([dateTimeFr(m.sentAt), m.nom, m.to, m.typeLabel, m.subject, m.status === 'sent' ? 'Parti' : 'Échec', m.error || ''].map(cell).join(';'));
+    }
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `emails-envoyes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   /* ── Candidatures ── */
