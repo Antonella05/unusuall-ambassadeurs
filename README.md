@@ -36,6 +36,12 @@ Les candidatures sont enregistrées dans Firestore (voir « Comptes »). Le Work
 
 Les formulaires de unusuall.online (contact, studio, bêta OMI, liste SOFIA) passent par la route `/contact` : message enregistré dans Firestore (`contactMessages`), puis alerte à la même adresse ; « Répondre » écrit à l'expéditeur. Protections contre les robots : origine du site et envoi JSON exigés, champ piège, délai minimal, un envoi par minute et par adresse, 30 messages par jour au total (le quota Resend est partagé avec les e-mails de compte). Aucun e-mail n'est envoyé à l'adresse saisie.
 
+## Relances
+
+Un compte créé sans candidature reçoit une relance 7 jours après l'inscription, puis une dernière à 14 jours (tâche planifiée du Worker, déclarée dans `worker/wrangler.toml`). Jamais relancés : les administrateurs, les comptes désactivés, les adresses de `REMINDER_SKIP`, les personnes ayant déjà postulé et les comptes de plus de 30 jours jamais relancés.
+
+**Demande d'arrêt** : dans la console Firebase → Firestore → collection `reminderLog`, document portant l'UID du compte (le créer s'il n'existe pas), ajouter le champ booléen `stop` = `true`.
+
 ## Mise en ligne (GitHub Pages)
 
 1. Dans le dépôt GitHub : **Settings → Pages → Source : Deploy from a branch**, branche `main`, dossier `/ (root)`.

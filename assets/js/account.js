@@ -725,7 +725,7 @@ if (PAGE === 'admin') {
   }
 
   /* ── E-mails envoyés (journal tenu par le Worker) ── */
-  const EMAIL_TYPES = { alert: 'Alerte équipe : candidature', contact: 'Alerte équipe : message du site', verify: 'Confirmation d’adresse', ack: 'Candidature reçue', approved: 'Candidature validée', rejected: 'Candidature refusée', reset: 'Mot de passe' };
+  const EMAIL_TYPES = { alert: 'Alerte équipe : candidature', contact: 'Alerte équipe : message du site', reminder: 'Relance candidature', verify: 'Confirmation d’adresse', ack: 'Candidature reçue', approved: 'Candidature validée', rejected: 'Candidature refusée', reset: 'Mot de passe' };
   const dateTimeFr = (t) => (t ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 
   async function renderEmails(pane) {

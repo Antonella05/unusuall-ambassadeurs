@@ -9,12 +9,13 @@
             /delete-account (suppression de son propre compte, connexion récente exigée),
             /contact (formulaires de unusuall.online, public).
    L'équipe est alertée par e-mail (TEAM_EMAIL) à chaque candidature et message.
+   Tâche planifiée (wrangler.toml) : relances à J+7 et J+14 des comptes sans candidature.
    Les e-mails partent via Resend avec la mise en page de worker/mail.js ;
    chaque envoi est noté dans la collection emailLog (page admin « E-mails envoyés »).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
-import { applicationAck, verifyEmail, passwordReset, decisionApproved, decisionRejected, teamAlert, sendMail } from './mail.js';
+import { applicationAck, verifyEmail, passwordReset, decisionApproved, decisionRejected, teamAlert, applicationReminder, sendMail } from './mail.js';
 
 const PROJECT = 'unusuall-ambassadeurs';
 const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
@@ -150,6 +151,22 @@ class Firestore {
     if (r.ok && !r.data.oobLink) return null;
     if (!r.ok) throw new Error('Lien Firebase impossible : ' + (r.msg || `HTTP ${r.status}`));
     return r.data.oobLink;
+  }
+  /* Tous les comptes de connexion (Firebase Auth). */
+  async listAuthUsers() {
+    const token = await this.accessToken('https://www.googleapis.com/auth/cloud-platform');
+    const users = [];
+    let page = '';
+    do {
+      const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:batchGet?maxResults=500${page ? `&nextPageToken=${encodeURIComponent(page)}` : ''}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error('Liste des comptes impossible : ' + (data.error?.message || `HTTP ${res.status}`));
+      users.push(...(data.users || []));
+      page = data.nextPageToken || '';
+    } while (page);
+    return users;
   }
   /* Supprime le compte de connexion (Firebase Auth). Déjà absent = succès. */
   async deleteAuthUser(uid) {
@@ -810,7 +827,7 @@ async function purgeAccount(fs, uid) {
   for (const idx of ['restaurantIndex', 'paymentIndex']) {
     (await fs.query(idx, { where: eq('ambassadorUid', uid) })).forEach((d) => rest.push(d.name));
   }
-  rest.push(docName(`mailLog/${uid}`), docName(`alertLog/${uid}`), docName(`verifyLog/${uid}`),
+  rest.push(docName(`mailLog/${uid}`), docName(`alertLog/${uid}`), docName(`reminderLog/${uid}`), docName(`verifyLog/${uid}`),
     docName(`decisionLog/${uid}_approved`), docName(`decisionLog/${uid}_rejected`));
   for (let i = 0; i < rest.length; i += 400) {
     await fs.commit(rest.slice(i, i + 400).map((name) => ({ delete: name })));
@@ -1089,8 +1106,78 @@ async function contactRoute(request, env, fs) {
   return reply({ ok: true });
 }
 
+/* ───────── Relances : compte créé, candidature jamais envoyée ───────── */
+const DAY_MS = 24 * 3600 * 1000;
+const REMINDER_MARGIN_MS = DAY_MS / 4;
+/* Au-delà, un compte jamais relancé est considéré comme abandonné. */
+const REMINDER_MAX_AGE_DAYS = 30;
+/* Le plan gratuit limite à 50 requêtes sortantes par exécution (environ 3 par envoi). */
+const REMINDER_BATCH = 8;
+
+/* Première relance 7 jours après l'inscription, seconde et dernière 14 jours
+   après (au moins 7 jours après la première). Exclus : administrateurs, comptes
+   désactivés, adresses de REMINDER_SKIP, toute personne ayant déjà postulé, et
+   les comptes dont reminderLog/{uid} porte stop = true (demande d'arrêt). */
+async function sendReminders(fs, env, now = Date.now()) {
+  const [users, ambassadors, acks, admins, logs] = await Promise.all([
+    fs.listAuthUsers(),
+    fs.query('ambassadors'),
+    fs.query('mailLog'),
+    fs.query('admins'),
+    fs.query('reminderLog')
+  ]);
+  const excluded = new Set([...ambassadors, ...acks, ...admins].map((d) => docId(d.name)));
+  const sentBefore = new Map(logs.map((d) => [docId(d.name), d]));
+  const skip = new Set(String(env.REMINDER_SKIP || '').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean));
+  const elapsed = (since, days) => now - since >= days * DAY_MS - REMINDER_MARGIN_MS;
+
+  let sent = 0;
+  let attempts = 0;
+  for (const u of users.sort((a, b) => Number(a.createdAt) - Number(b.createdAt))) {
+    if (attempts >= REMINDER_BATCH) break;
+    const uid = u.localId;
+    const email = str(u.email).toLowerCase();
+    const created = Number(u.createdAt);
+    if (!email || !created || u.disabled || excluded.has(uid) || skip.has(email)) continue;
+    const doc = sentBefore.get(uid);
+    const prev = doc ? decFields(doc.fields) : {};
+    const count = Number(prev.count) || 0;
+    if (prev.stop === true || count >= 2) continue;
+    if (count === 0 && (!elapsed(created, 7) || now - created > REMINDER_MAX_AGE_DAYS * DAY_MS)) continue;
+    if (count === 1 && (!elapsed(created, 14) || !elapsed(new Date(prev.lastAt).getTime(), 7))) continue;
+
+    attempts += 1;
+    const name = docName(`reminderLog/${uid}`);
+    try {
+      /* Réservation avant l'envoi : deux exécutions ne peuvent pas doubler un e-mail. */
+      const claim = await fs.commit([{
+        update: { name, fields: encFields({ count: count + 1, lastAt: new Date(now), to: email }) },
+        updateMask: { fieldPaths: ['count', 'lastAt', 'to'] },
+        currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false }
+      }]);
+      try {
+        await sendLogged(fs, env, { type: 'reminder', to: email, uid }, { ...applicationReminder({ nom: u.displayName, last: count === 1 }), replyTo: env.TEAM_EMAIL || TEAM_EMAIL });
+        sent += 1;
+      } catch (e) {
+        /* Envoi raté : on annule la réservation pour réessayer au prochain passage. */
+        await fs.commit([doc
+          ? { update: { name, fields: doc.fields }, currentDocument: { updateTime: claim.writeResults?.[0]?.updateTime } }
+          : { delete: name }]);
+        throw e;
+      }
+    } catch (e) {
+      console.error('[relance]', e.message);
+    }
+  }
+  console.log(`[relance] ${sent} envoyée(s)`);
+  return sent;
+}
+
 /* ───────── Point d'entrée ───────── */
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendReminders(new Firestore(env), env));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';

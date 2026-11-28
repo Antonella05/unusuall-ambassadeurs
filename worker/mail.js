@@ -3,7 +3,8 @@
    passwordReset : choix d'un nouveau mot de passe ;
    applicationAck : accusé de réception de candidature ;
    decisionApproved / decisionRejected : réponse à la candidature ;
-   teamAlert : alerte interne à l'équipe (candidature, message des sites). */
+   teamAlert : alerte interne à l'équipe (candidature, message des sites) ;
+   applicationReminder : relances des comptes sans candidature. */
 
 const SITE = 'https://ambassadeurs.unusuall.online';
 const WHATSAPP_GROUP = 'https://chat.whatsapp.com/Iq3EsQlbvzS7yzqseZZ13F';
@@ -228,6 +229,43 @@ export function decisionRejected({ nom }) {
     'Si vous avez une question, répondez simplement à cet e-mail.', '',
     'Bien cordialement,', "L'équipe UNUSUALL"
   ].join('\n');
+  return { subject, html, text };
+}
+
+/* Relance d'un compte créé sans candidature ; la seconde est la dernière. */
+export function applicationReminder({ nom, last = false } = {}) {
+  const hello = helloFor(nom);
+  const link = `${SITE}/espace.html`;
+  const subject = last
+    ? 'Dernier rappel pour votre candidature Ambassadeur UNUSUALL'
+    : 'Il ne reste qu’une étape pour devenir Ambassadeur UNUSUALL';
+  const intro = 'Vous avez créé votre compte sur la plateforme Ambassadeurs UNUSUALL, mais nous n’avons pas encore votre candidature.';
+  const steps = [
+    'Confirmez votre adresse e-mail, si ce n’est pas déjà fait (pensez à regarder dans vos spams).',
+    'Connectez-vous à votre espace.',
+    'Remplissez le formulaire et envoyez-le.'
+  ];
+  const after = 'L’inscription au programme est gratuite. Après l’envoi de votre candidature, nous vous répondons sous 72 heures.';
+  const help = 'Vous êtes bloqué quelque part ? Répondez simplement à cet e-mail, nous vous aiderons.';
+  const stop = last
+    ? 'C’est notre dernier rappel : nous ne vous relancerons plus.'
+    : 'Si vous ne souhaitez plus recevoir ces rappels, dites-le-nous en répondant à cet e-mail.';
+  const html = layout({
+    subject,
+    preheader: intro,
+    pill: last ? 'Dernier rappel' : 'Candidature à terminer',
+    title: 'Terminez votre candidature',
+    body: `
+        <p style="${P}">${esc(hello)}</p>
+        <p style="${P}">${esc(intro)}</p>
+        <ol style="margin:0 0 14px;padding-left:22px;font-size:16px;line-height:1.7;">${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+${button(link, 'Terminer ma candidature')}
+${fallbackLink(link)}
+        <p style="${P}">${esc(after)}</p>
+        <p style="${P}">${esc(help)}</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#5a7260;">${esc(stop)}</p>`
+  });
+  const text = [hello, '', intro, '', ...steps.map((s, i) => `${i + 1}. ${s}`), '', `Terminer ma candidature : ${link}`, '', after, '', help, stop, '', 'À très vite,', "L'équipe UNUSUALL"].join('\n');
   return { subject, html, text };
 }
 

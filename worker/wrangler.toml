@@ -1,3 +1,11 @@
 name = "unusuall-ambassadeurs"
 main = "index.js"
 compatibility_date = "2026-11-01"
+
+# Relances J+7 / J+14 : chaque jour à 9 h, 10 h et 11 h UTC (10 h à 12 h au Bénin).
+[triggers]
+crons = ["0 9,10,11 * * *"]
+
+# Adresses jamais relancées (comptes de test), séparées par des virgules.
+[vars]
+REMINDER_SKIP = "gravi10008@gmail.com,nellatamadaho@gmail.com"
