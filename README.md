@@ -30,9 +30,11 @@ node scripts/build-pages.mjs
 
 **Ajouter un produit** : dans `scripts/build-pages.mjs`, passer sa carte de « Bientôt » à « Ouvert » (pages Programme et Produits), ajouter son tableau dans Gains, et activer sa case dans le formulaire de Postuler.
 
-## Formulaire
+## Formulaires et alertes
 
-Les candidatures sont enregistrées dans Firestore (voir « Comptes ») et déclenchent une alerte e-mail via Formspree, objet « [Ambassadeur UNUSUALL] Nouvelle candidature ». Si ce formulaire limite les domaines autorisés, y ajouter `ambassadeurs.unusuall.online`.
+Les candidatures sont enregistrées dans Firestore (voir « Comptes »). Le Worker envoie ensuite, via Resend, une alerte à l'équipe (`contactunusuall@gmail.com`, modifiable avec la variable `TEAM_EMAIL`) et l'accusé de réception au candidat.
+
+Les formulaires de unusuall.online (contact, studio, bêta OMI, liste SOFIA) passent par la route `/contact` : message enregistré dans Firestore (`contactMessages`), puis alerte à la même adresse ; « Répondre » écrit à l'expéditeur. Protections contre les robots : origine du site et envoi JSON exigés, champ piège, délai minimal, un envoi par minute et par adresse, 30 messages par jour au total (le quota Resend est partagé avec les e-mails de compte). Aucun e-mail n'est envoyé à l'adresse saisie.
 
 ## Mise en ligne (GitHub Pages)
 
@@ -54,5 +56,3 @@ Projet Firebase : `unusuall-ambassadeurs` (formule gratuite Spark), base Firesto
 Calcul des gains : 30 % du 1er mois payé, puis 10 % de chaque mois payé suivant, plafonné à 10 mois (le 2e mois est offert au client).
 
 **Donner l'accès administrateur** : créer un compte sur la plateforme, puis dans la console Firebase → Firestore → créer la collection `admins` avec un document dont l'identifiant est l'UID du compte (visible dans Authentication → Utilisateurs). Aucun champ n'est nécessaire.
-
-Les candidatures envoient aussi une alerte e-mail via Formspree (`https://formspree.io/f/xzdqanqq`).

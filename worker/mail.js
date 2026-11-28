@@ -2,7 +2,8 @@
    verifyEmail   : confirmation de l'adresse e-mail (à la création du compte) ;
    passwordReset : choix d'un nouveau mot de passe ;
    applicationAck : accusé de réception de candidature ;
-   decisionApproved / decisionRejected : réponse à la candidature. */
+   decisionApproved / decisionRejected : réponse à la candidature ;
+   teamAlert : alerte interne à l'équipe (candidature, message des sites). */
 
 const SITE = 'https://ambassadeurs.unusuall.online';
 const WHATSAPP_GROUP = 'https://chat.whatsapp.com/Iq3EsQlbvzS7yzqseZZ13F';
@@ -230,9 +231,28 @@ export function decisionRejected({ nom }) {
   return { subject, html, text };
 }
 
+/* Alerte interne : un titre, les champs reçus, et au besoin un bouton.
+   Tout est échappé : les valeurs viennent de formulaires publics. */
+export function teamAlert({ subject, title, pill, rows, link, linkLabel }) {
+  const filled = rows.filter(([, v]) => String(v ?? '').trim());
+  const html = layout({
+    subject,
+    preheader: filled.slice(0, 2).map(([, v]) => v).join(' · '),
+    pill,
+    title: esc(title),
+    signoff: 'Alerte automatique',
+    body: `${filled.map(([k, v]) => `
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3d5a47;">${esc(k)}</p>
+        <p style="${P}white-space:pre-wrap;word-break:break-word;">${esc(v)}</p>`).join('')}
+${link ? button(link, linkLabel) : ''}`
+  });
+  const text = [title, '', ...filled.flatMap(([k, v]) => [`${k} : ${v}`, '']), ...(link ? [`${linkLabel} : ${link}`] : [])].join('\n');
+  return { subject, html, text };
+}
+
 /* Envoi via l'API Resend (https://resend.com). Secret RESEND_API_KEY,
    expéditeur MAIL_FROM (domaine vérifié chez Resend). */
-export async function sendMail(env, { to, subject, html, text }) {
+export async function sendMail(env, { to, subject, html, text, replyTo }) {
   if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY manquant');
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -240,7 +260,7 @@ export async function sendMail(env, { to, subject, html, text }) {
     body: JSON.stringify({
       from: env.MAIL_FROM || 'UNUSUALL Ambassadeurs <ambassadeurs@unusuall.online>',
       to: [to],
-      reply_to: 'services@unusuall.online',
+      reply_to: replyTo || 'services@unusuall.online',
       subject,
       html,
       text

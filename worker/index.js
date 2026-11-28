@@ -6,19 +6,25 @@
             /apply-ack (accusé de réception de candidature par e-mail, jeton Firebase),
             /verify-email (lien de confirmation d'adresse, jeton Firebase),
             /reset-password (lien de nouveau mot de passe, public),
-            /delete-account (suppression de son propre compte, connexion récente exigée).
+            /delete-account (suppression de son propre compte, connexion récente exigée),
+            /contact (formulaires de unusuall.online, public).
+   L'équipe est alertée par e-mail (TEAM_EMAIL) à chaque candidature et message.
    Les e-mails partent via Resend avec la mise en page de worker/mail.js ;
    chaque envoi est noté dans la collection emailLog (page admin « E-mails envoyés »).
    Les données restent dans Firestore ; ce Worker y accède via l'API REST avec un
    compte de service (secret SERVICE_ACCOUNT_JSON, jamais côté navigateur). */
 import qrcode from 'qrcode-generator';
-import { applicationAck, verifyEmail, passwordReset, decisionApproved, decisionRejected, sendMail } from './mail.js';
+import { applicationAck, verifyEmail, passwordReset, decisionApproved, decisionRejected, teamAlert, sendMail } from './mail.js';
 
 const PROJECT = 'unusuall-ambassadeurs';
 const DOC_ROOT = `projects/${PROJECT}/databases/(default)/documents`;
 const API_BASE = `https://firestore.googleapis.com/v1/${DOC_ROOT}`;
 const ALLOWED_ORIGINS = ['https://ambassadeurs.unusuall.online', 'http://127.0.0.1:8123', 'http://localhost:8123'];
 const CONTINUE_URL = 'https://ambassadeurs.unusuall.online/espace.html';
+const SITE_ORIGIN = 'https://ambassadeurs.unusuall.online';
+const TEAM_EMAIL = 'contactunusuall@gmail.com';
+/* Site principal : seul autorisé à utiliser /contact. */
+const CONTACT_ORIGINS = ['https://unusuall.online', 'https://www.unusuall.online', 'http://127.0.0.1:5500', 'http://localhost:5500'];
 const CORS_PATHS = ['/admin', '/apply-ack', '/verify-email', '/reset-password', '/delete-account'];
 const corsFor = (request) => {
   const origin = request.headers.get('Origin') || '';
@@ -34,6 +40,8 @@ const DEFAULT_SETTINGS = {
 };
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
+/* Pour les objets d'e-mail : pas de retour à la ligne, longueur bornée. */
+const oneLine = (v) => String(v).replace(/\s+/g, ' ').trim().slice(0, 150);
 const norm = (v) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const digits = (v) => String(v || '').replace(/\D/g, '');
 const fold = (v) => String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -802,7 +810,7 @@ async function purgeAccount(fs, uid) {
   for (const idx of ['restaurantIndex', 'paymentIndex']) {
     (await fs.query(idx, { where: eq('ambassadorUid', uid) })).forEach((d) => rest.push(d.name));
   }
-  rest.push(docName(`mailLog/${uid}`), docName(`verifyLog/${uid}`),
+  rest.push(docName(`mailLog/${uid}`), docName(`alertLog/${uid}`), docName(`verifyLog/${uid}`),
     docName(`decisionLog/${uid}_approved`), docName(`decisionLog/${uid}_rejected`));
   for (let i = 0; i < rest.length; i += 400) {
     await fs.commit(rest.slice(i, i + 400).map((name) => ({ delete: name })));
@@ -887,6 +895,43 @@ async function admin(request, env, fs) {
   return json({ error: 'unknown_action' }, 400, cors);
 }
 
+/* Alerte à l'équipe pour une nouvelle candidature, une seule fois par compte.
+   Renvoie false en cas d'échec, pour que le navigateur puisse réessayer. */
+async function alertApplication(fs, env, uid, a, email) {
+  const log = docName(`alertLog/${uid}`);
+  try {
+    await fs.commit([{ update: { name: log, fields: encFields({ sentAt: new Date() }) }, currentDocument: { exists: false } }]);
+  } catch (e) {
+    if (isDuplicate(e)) return true;
+    console.error('[alerte candidature]', e.message);
+    return false;
+  }
+  const list = (v) => (Array.isArray(v) ? v.join(', ') : '');
+  const later = list(a.produitsFuturs);
+  const mail = teamAlert({
+    subject: oneLine(`[Ambassadeur UNUSUALL] Nouvelle candidature : ${str(a.nom)}`),
+    title: 'Nouvelle candidature',
+    pill: 'À traiter sous 72 h',
+    rows: [
+      ['Nom', a.nom], ['WhatsApp', a.whatsapp], ['E-mail', email],
+      ['Ville · quartier', [a.ville, a.quartier].filter(Boolean).join(' · ')],
+      ['Profession', a.profession], ['Réseau', list(a.reseau)],
+      ['Produits', [list(a.produits), later && `à l’ouverture : ${later}`].filter(Boolean).join(' ; ')],
+      ['Profil', a.profilLien], ['Photo', a.photo], ['Motivation', a.motivation]
+    ],
+    link: `${SITE_ORIGIN}/admin.html`,
+    linkLabel: 'Ouvrir l’administration'
+  });
+  try {
+    await sendLogged(fs, env, { type: 'alert', to: env.TEAM_EMAIL || TEAM_EMAIL, uid }, { ...mail, replyTo: email });
+    return true;
+  } catch (e) {
+    console.error('[alerte candidature]', e.message);
+    await fs.commit([{ delete: log }]).catch(() => {});
+    return false;
+  }
+}
+
 /* Accusé de réception envoyé au candidat, une seule fois par compte :
    mailLog/{uid} est créé avant l'envoi (création conditionnelle = pas de doublon). */
 async function applyAck(request, env, fs) {
@@ -901,11 +946,15 @@ async function applyAck(request, env, fs) {
   const a = await fs.data(`ambassadors/${claims.sub}`);
   if (!a) throw httpErr(404, 'not-found', 'Aucune candidature pour ce compte.');
   if (a.status !== 'pending') return json({ ok: true, skipped: true }, 200, cors);
+  const alerted = await alertApplication(fs, env, claims.sub, a, claims.email);
+  const done = (extra) => (alerted
+    ? json({ ok: true, ...extra }, 200, cors)
+    : json({ error: "L'alerte à l'équipe n'a pas pu être envoyée.", code: 'alert-failed' }, 502, cors));
   const log = docName(`mailLog/${claims.sub}`);
   try {
     await fs.commit([{ update: { name: log, fields: encFields({ applicationAckAt: new Date(), to: claims.email }) }, currentDocument: { exists: false } }]);
   } catch (e) {
-    if (isDuplicate(e)) return json({ ok: true, already: true }, 200, cors);
+    if (isDuplicate(e)) return done({ already: true });
     throw e;
   }
   try {
@@ -915,7 +964,7 @@ async function applyAck(request, env, fs) {
     await fs.commit([{ delete: log }]).catch(() => {});
     throw httpErr(502, 'mail-failed', "L'e-mail de confirmation n'a pas pu être envoyé.");
   }
-  return json({ ok: true }, 200, cors);
+  return done({});
 }
 
 /* Anti-abus : un envoi par minute et par clé (compte ou adresse). */
@@ -961,6 +1010,85 @@ async function resetPasswordRoute(request, env, fs) {
   return json({ ok: true }, 200, cors);
 }
 
+/* ───────── /contact : formulaires de unusuall.online ───────── */
+const CONTACT_SOURCES = {
+  contact: { label: 'Contact', required: ['name', 'message'] },
+  'studio-projet': { label: 'Studio sur mesure', required: ['name', 'message'] },
+  'omi-beta': { label: 'Bêta OMI', required: ['name'] },
+  'sofia-waitlist': { label: 'Liste d’attente SOFIA', required: [] }
+};
+/* Le quota d'envoi est partagé avec les e-mails de compte : on plafonne les messages publics. */
+const CONTACT_DAILY_MAX = 30;
+const CONTACT_MIN_MS = 2500;
+
+/* Chaque message est enregistré (contactMessages) avant l'envoi de l'alerte.
+   Aucun e-mail n'est envoyé à l'adresse saisie : un robot ne peut pas se servir
+   du formulaire pour écrire à des tiers. */
+async function contactRoute(request, env, fs) {
+  const origin = request.headers.get('Origin') || '';
+  const allowed = CONTACT_ORIGINS.includes(origin);
+  const cors = allowed
+    ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' }
+    : {};
+  const reply = (data, status = 200) => json(data, status, cors);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'POST') return reply({ error: 'method_not_allowed' }, 405);
+  if (!allowed) return reply({ error: 'origin_not_allowed' }, 403);
+  if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) return reply({ error: 'json_required' }, 415);
+  const raw = await request.text();
+  if (raw.length > 12000) return reply({ error: 'too_large' }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch { return reply({ error: 'invalid_json' }, 400); }
+  if (!body || typeof body !== 'object') return reply({ error: 'invalid_json' }, 400);
+  /* Champ piège, invisible pour un visiteur : réponse normale, rien n'est envoyé. */
+  if (str(body._gotcha)) return reply({ ok: true });
+  if (!(Number(body.elapsed) >= CONTACT_MIN_MS)) return reply({ error: 'too_fast' }, 429);
+
+  const source = str(body.source);
+  if (!Object.hasOwn(CONTACT_SOURCES, source)) return reply({ error: 'invalid_source' }, 400);
+  const kind = CONTACT_SOURCES[source];
+  const data = {
+    source,
+    name: oneLine(str(body.name)).slice(0, 100),
+    email: str(body.email).toLowerCase().slice(0, 200),
+    sujet: oneLine(str(body.sujet)).slice(0, 80),
+    message: str(body.message).slice(0, 4000)
+  };
+  if (!/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]{2,}$/.test(data.email) || kind.required.some((k) => !data[k])) {
+    return reply({ error: 'invalid_fields' }, 400);
+  }
+
+  const day = new Date().toISOString().slice(0, 10);
+  const count = Number((await fs.data(`contactQuota/${day}`))?.count) || 0;
+  if (count >= CONTACT_DAILY_MAX) return reply({ error: 'daily_limit' }, 429);
+  const ip = request.headers.get('CF-Connecting-IP') || '';
+  try {
+    if (ip) await throttle(fs, `contactLog/${await sha256Hex(`ip:${ip}`)}`, 'lastAt', 30);
+    await throttle(fs, `contactLog/${await sha256Hex(`${source}:${data.email}`)}`, 'lastAt', 60);
+  } catch (e) {
+    if (e.status === 429) return reply({ error: 'too_many_requests' }, 429);
+    throw e;
+  }
+
+  await fs.commit([
+    { update: { name: docName(`contactMessages/${crypto.randomUUID()}`), fields: encFields({ ...data, createdAt: new Date() }) }, currentDocument: { exists: false } },
+    { update: { name: docName(`contactQuota/${day}`), fields: encFields({ count: count + 1 }) } }
+  ]);
+  const mail = teamAlert({
+    subject: oneLine(`[UNUSUALL] ${kind.label} : ${data.name || data.email}`),
+    title: `Nouveau message · ${kind.label}`,
+    pill: 'Site unusuall.online',
+    rows: [['Nom', data.name], ['E-mail', data.email], ['Sujet', data.sujet], ['Message', data.message]]
+  });
+  try {
+    await sendLogged(fs, env, { type: 'contact', to: env.TEAM_EMAIL || TEAM_EMAIL }, { ...mail, replyTo: data.email });
+  } catch (e) {
+    console.error('[contact]', e.message);
+    return reply({ error: 'mail_failed' }, 502);
+  }
+  return reply({ ok: true });
+}
+
 /* ───────── Point d'entrée ───────── */
 export default {
   async fetch(request, env) {
@@ -981,6 +1109,7 @@ export default {
       if (url.pathname === '/verify-email') return await verifyEmailRoute(request, env, fs);
       if (url.pathname === '/reset-password') return await resetPasswordRoute(request, env, fs);
       if (url.pathname === '/delete-account') return await deleteAccountRoute(request, fs);
+      if (url.pathname === '/contact') return await contactRoute(request, env, fs);
       if (url.pathname === '/') return json({ ok: true, service: 'unusuall-ambassadeurs' });
       return json({ error: 'not_found' }, 404);
     } catch (err) {

@@ -26,9 +26,20 @@ const auth = getAuth(app);
 auth.languageCode = 'fr';
 const db = getFirestore(app);
 
-const FORMSPREE = 'https://formspree.io/f/xzdqanqq';
 /* Backend gratuit : Worker Cloudflare (worker/index.js), pas de Cloud Functions. */
 const FUNCTIONS_ORIGIN = 'https://unusuall-ambassadeurs.antonellatamadaho.workers.dev';
+
+/* Réessaie une fois en cas d'échec ; le Worker n'envoie chaque e-mail qu'une fois par compte. */
+async function sendApplicationMails(user, retry = true) {
+  try {
+    const token = await user.getIdToken();
+    const res = await fetch(`${FUNCTIONS_ORIGIN}/apply-ack`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, keepalive: true });
+    if (!res.ok) throw new Error(`apply-ack ${res.status}`);
+  } catch (ex) {
+    console.error('[e-mails de candidature]', ex);
+    if (retry) setTimeout(() => sendApplicationMails(user, false), 5000);
+  }
+}
 const PAGE = document.body.dataset.account;
 
 /* Réglages par défaut (miroir de worker/index.js) — l'espace ambassadeur les
@@ -462,17 +473,8 @@ if (PAGE === 'space') {
       };
       try {
         await setDoc(doc(db, 'ambassadors', user.uid), data);
-        // Alerte e-mail pour l'équipe (non bloquante)
-        const mail = new FormData();
-        mail.append('_subject', '[Ambassadeur UNUSUALL] Nouvelle candidature');
-        ['nom', 'whatsapp', 'email', 'ville', 'quartier', 'profession', 'profilLien', 'photo', 'motivation'].forEach((k) => mail.append(k, data[k]));
-        mail.append('reseau', data.reseau.join(', '));
-        mail.append('produits', data.produits.concat(data.produitsFuturs.map((p) => p + ' (à l\'ouverture)')).join(', '));
-        fetch(FORMSPREE, { method: 'POST', body: mail, headers: { Accept: 'application/json' } }).catch(() => {});
-        // Accusé de réception envoyé au candidat par le Worker (non bloquant)
-        user.getIdToken()
-          .then((t) => fetch(`${FUNCTIONS_ORIGIN}/apply-ack`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } }))
-          .catch((ex) => console.error('[accusé de réception]', ex));
+        // Alerte à l'équipe et accusé de réception, envoyés par le Worker (non bloquants)
+        sendApplicationMails(user);
         form.hidden = true;
         root.innerHTML = statusCard({ ...data, createdAt: new Date() });
       } catch (ex) {
@@ -723,7 +725,7 @@ if (PAGE === 'admin') {
   }
 
   /* ── E-mails envoyés (journal tenu par le Worker) ── */
-  const EMAIL_TYPES = { verify: 'Confirmation d’adresse', ack: 'Candidature reçue', approved: 'Candidature validée', rejected: 'Candidature refusée', reset: 'Mot de passe' };
+  const EMAIL_TYPES = { alert: 'Alerte équipe : candidature', contact: 'Alerte équipe : message du site', verify: 'Confirmation d’adresse', ack: 'Candidature reçue', approved: 'Candidature validée', rejected: 'Candidature refusée', reset: 'Mot de passe' };
   const dateTimeFr = (t) => (t ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 
   async function renderEmails(pane) {
